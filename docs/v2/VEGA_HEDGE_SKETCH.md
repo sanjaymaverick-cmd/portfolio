@@ -422,6 +422,258 @@ Simple shortfall stub (desk metric, not OMS):
 
 ---
 
+## Concrete execution examples
+
+Illustrative numbers only (not live MCX quotes). Units: `vega` = ₹ per **1.00** vol point. `nu_star = 0`, `lot_step = 1`.
+
+### Shared policy knobs
+
+```text
+symbol:           GOLD
+vega_limit:       200,000 ₹/vol-pt
+warn_utilization: 80%
+nu_star:          0
+lot_step:         1
+```
+
+---
+
+### Example A — Long vega over limit (sell options, then futures)
+
+**Book before**
+
+| Item | Value |
+|------|-------|
+| Position | Long 4× ATM GOLD calls |
+| `vega_per_lot` (book) | +60,000 |
+| `net_vega` | 4 × 60,000 = **+240,000** |
+| Utilization | 240k / 200k = **120%** → over limit |
+| `net_delta_lots` | +2.0 (Δ≈0.50 each) |
+| Regime | Calm |
+
+**Hedge contract chosen by human**
+
+| Item | Value |
+|------|-------|
+| Contract | `GOLD26MAY 72000 CE` (example label) |
+| `hedge_vega_per_lot` | +55,000 (slightly different strike) |
+| `hedge_delta` | 0.48 |
+
+**Sizing**
+
+```text
+q_raw = (0 - 240_000) / 55_000 = -4.36 lots
+q_opt = snap(-4.36, 1) = -4 lots          # sell 4
+residual_vega = 240_000 + (-4)*55_000 = +20_000
+
+Δ after options ≈ 2.0 + (-4)*0.48 = 2.0 - 1.92 = +0.08
+q_fut = snap(-0.08, 1) = 0                 # no futures lot
+```
+
+**Review → human**
+
+- Urgency: `review` (over limit, not Stress)
+- Ack → intent: sell 4× `GOLD26MAY 72000 CE`, no futures
+- Tactic: scale 2 + 2 (thin offer) or take if depth OK
+
+**Fills (journal)**
+
+| Time | Contract | Side | Lots | Price | Type |
+|------|----------|------|------|-------|------|
+| T1 | GOLD26MAY 72000 CE | Sell | 2 | 312 | option |
+| T2 | GOLD26MAY 72000 CE | Sell | 2 | 309 | option |
+
+Ref mid at ack: 315 → shortfall on sells is small (sold near mid).
+
+**After re-mark**
+
+| Item | Value |
+|------|-------|
+| `net_vega_after` | ~+20,000 (under limit) |
+| Futures | none |
+| Post-mortem | Limit restored; residual ν accepted |
+
+---
+
+### Example B — Short vega in Stress (buy options hard, then futures)
+
+**Book before**
+
+| Item | Value |
+|------|-------|
+| Position | Short 3× GOLD puts (used as “inventory hedge”) |
+| `vega_per_lot` | +50,000 each long → short 3 ⇒ **net_vega = −150,000** |
+| Limit | 100,000 → utilization **150%** |
+| `net_delta_lots` | +1.2 (short puts ⇒ positive delta) |
+| Regime | **Stress** |
+
+**Hedge contract**
+
+| Item | Value |
+|------|-------|
+| Buy | Same-expiry puts, `hedge_vega_per_lot = +50,000`, `hedge_delta = −0.40` |
+
+**Sizing toward `nu_star = 0`**
+
+```text
+q_raw = (0 - (-150_000)) / 50_000 = +3.0
+q_opt = +3                                # buy 3 puts
+residual_vega = 0
+
+Δ after options ≈ 1.2 + 3*(−0.40) = 1.2 - 1.2 = 0
+q_fut = 0
+```
+
+**Human tactic**
+
+- Urgency: `elevated`
+- Level 4–5: **take** offers on puts; do not rest all day
+- Intent: buy 3 puts, policy_kind=`vega_defense`
+
+**Fills**
+
+| Side | Lots | Note |
+|------|------|------|
+| Buy put | 3 | Paid offer; shortfall vs mid accepted |
+
+**Lesson**
+
+- Short options as inventory hedge created **short ν** — inventory should prefer futures (`inventory_hedge`) going forward
+- Post-mortem tags: vega defense success; process note on policy misuse
+
+---
+
+### Example C — Long vega under limit + harvest Δ band (no vega trade)
+
+**Book before**
+
+| Item | Value |
+|------|-------|
+| Long straddle | `net_vega = +120,000` |
+| Limit | 200,000 → util **60%** (under warn) |
+| Spot rally | `net_delta_lots` drifts to **+1.4** |
+| `vol_harvest` band | min 1.0 lot |
+
+**What fires**
+
+| Policy | Action |
+|--------|--------|
+| `vega_defense` | **No** VEGA REVIEW (within limit) |
+| `vol_harvest` | Δ REVIEW: sell ~1 futures lot to flatten |
+
+**Human**
+
+- Ack **only** harvest Δ intent
+- Execute **1 short gold future**
+- Do **not** sell the straddle “to clean risk”
+
+**Journal**
+
+| Intent tag | Fill |
+|------------|------|
+| `vol_harvest` | Sell 1 GOLD future |
+
+Vega unchanged by design — scalping mechanics, not vega hedge.
+
+---
+
+### Example D — Partial fill + residual (re-mark loop)
+
+**Model**
+
+```text
+net_vega = +280,000  limit = 200,000
+hedge_vega_per_lot = 60,000
+q_raw = -4.67 → q_opt = -4
+residual_vega after full fill ≈ +40,000
+```
+
+**Execution**
+
+| Step | What happens |
+|------|----------------|
+| Intent | Sell 4 calls |
+| Fill | Only **2** sell @ market (depth) |
+| Journal | Partial: 2 of 4, link same intent_id |
+| Re-mark | `net_vega ≈ +280k - 2*60k = +160k` (now under limit) |
+| Decision | Accept residual; snooze further sells **or** leave working order outside Meridian |
+
+Do not assume the unfilled 2 lots still “exist” as a hedge in the book.
+
+---
+
+### Example E — Wrong tool (futures-only cannot fix vega)
+
+**Mistake**
+
+```text
+net_vega = +250,000  (over limit)
+Human sells 2 GOLD futures only
+```
+
+**Result**
+
+| Greek | Change |
+|-------|--------|
+| Delta | Reduced |
+| **Vega** | **Unchanged** |
+| Next VEGA REVIEW | Still over limit |
+
+**Correct path**
+
+Sell options (or option spreads) sized on `hedge_vega_per_lot`, then futures for residual Δ only.
+
+---
+
+### Example F — Event tighten then post-crush
+
+**T−1 day (before event)**
+
+```text
+Effective limit = 200,000 × 0.5 = 100,000   # event_tighten
+net_vega = +140,000 → over effective limit
+→ VEGA REVIEW: sell options toward lower budget
+```
+
+**Human:** scale sell, fill 2 lots, ν → ~+80k before event.
+
+**T+0 after crush**
+
+```text
+IV −3 vol points
+Long ν mark-to-market ≈ −3 × 80,000 = −240,000 on options (illustrative)
+```
+
+**Tactic after crush**
+
+- Often **Level 0–1** on further vol sales (already paid the crush)
+- Journal: separate **vega_pnl_est** from any futures scalp P&L
+- Do not merge with inventory fills
+
+---
+
+### Example G — Multi-policy same morning (separate tickets)
+
+| Alert | Intent | Broker action |
+|-------|--------|----------------|
+| Inventory GOLD ratio low | `inventory_hedge` +1 future | Buy 1 future |
+| Harvest Δ on silver straddle | `vol_harvest` −1 future | Sell 1 silver future |
+| Crude short ν over limit | `vega_defense` buy 2 puts | Buy 2 crude puts, then Δ clean-up |
+
+Three acks, three journal tags — never one combined “desk ticket.”
+
+---
+
+### Quick reference — numbers checklist
+
+1. `util = |net_vega| / vega_limit`  
+2. `q_opt = snap((nu_star - net_vega) / hedge_vega_per_lot)`  
+3. `residual_vega = net_vega + q_opt * hedge_vega_per_lot`  
+4. `q_fut = snap(-(net_delta + q_opt * hedge_delta))`  
+5. Execute options → log fills → futures if `q_fut ≠ 0` → re-mark  
+
+---
+
 ## Journal / post-mortem
 
 - Intent: `policy_kind`, opt/fut lots, `net_vega` before, `iv` before  
@@ -465,4 +717,5 @@ Mute actionable lots if Greeks are stale.
 
 Drafted: 2026-08-13  
 Execution loop section: 2026-08-13  
+Concrete execution examples: 2026-08-13  
 Repo: `sanjaymaverick-cmd/portfolio`
