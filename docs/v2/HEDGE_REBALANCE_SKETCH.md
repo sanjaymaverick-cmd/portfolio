@@ -24,6 +24,8 @@ Related: `VERSION_2_DECISIONS.md` (MCX roll, ack, hedge wording, post-mortems), 
 | `notional_inr` | `lots * multiplier * mark_inr` (signed with lots) |
 | `hedge_ratio` | `-hedge_notional / exposure_notional` when exposure ≠ 0; 0 if flat exposure |
 | Target ratio `h_star` | In `[0, 1]` = fraction of exposure notional intended to be offset by hedges |
+| `delta` (per leg) | Underlier sensitivity per lot; **1.0** for futures/spot; option Δ in (−1, 1) |
+| `gamma` (per leg) | ∂Δ/∂S per lot; **0** for linear futures/spot; non-zero for options |
 
 Example: +2 lots gold inventory, −1 lot gold futures hedge → partially hedged.
 
@@ -62,11 +64,22 @@ class BookLeg:
     multiplier: float           # contract multiplier
     mark_inr: float             # price in INR per underlying unit
     contract_label: str = ""    # e.g. "GOLD26APRxxxx" or "CONTINUOUS"
+    delta: float = 1.0          # 1.0 linear inventory; option book legs if any
+    gamma: float = 0.0          # 0.0 linear; option Γ per lot if modelled
     as_of: Optional[date] = None
+
+    @property
+    def effective_lots(self) -> float:
+        return self.lots * self.delta
 
     @property
     def notional_inr(self) -> float:
         return self.lots * self.multiplier * self.mark_inr
+
+    @property
+    def gamma_lots(self) -> float:
+        """Aggregate gamma in Δ-per-unit-S terms for this leg."""
+        return self.lots * self.gamma
 
 
 @dataclass(frozen=True)
@@ -79,7 +92,8 @@ class HedgeLeg:
     multiplier: float
     mark_inr: float
     contract_label: str = ""
-    delta: float = 1.0          # 1.0 for futures; option delta in (0, 1] if used later
+    delta: float = 1.0          # 1.0 for futures; option delta in (-1, 1) if used later
+    gamma: float = 0.0          # 0.0 for futures; option gamma per lot if used later
     as_of: Optional[date] = None
 
     @property
@@ -89,6 +103,10 @@ class HedgeLeg:
     @property
     def notional_inr(self) -> float:
         return self.effective_lots * self.multiplier * self.mark_inr
+
+    @property
+    def gamma_lots(self) -> float:
+        return self.lots * self.gamma
 
 
 @dataclass(frozen=True)
@@ -105,6 +123,7 @@ class HedgeExposure:
     hedge_notional_inr: float
     as_of: date
     contract_notes: str = ""    # roll / continuous disclaimer for UI
+    net_gamma: float = 0.0      # sum of leg gamma_lots (book + hedge)
 
     @property
     def net_lots(self) -> float:
@@ -138,6 +157,8 @@ class SymbolPolicy:
     band: RebalanceBand = field(default_factory=RebalanceBand)
     lot_step: float = 1.0           # MCX integer lot granularity
     enabled: bool = True
+    # Optional gamma awareness (v2.x — ignore if net_gamma always 0)
+    gamma_warn_abs: float = 0.0     # if >0 and |net_gamma| >= this → flag in review
 
 
 @dataclass(frozen=True)
@@ -178,6 +199,8 @@ class HedgeReview:
     reason: str
     copy_review: str                # user-facing text (question form)
     suppress_reason: Optional[str] = None  # if not shown (blackout, cooldown)
+    net_gamma: float = 0.0
+    gamma_flag: bool = False        # |net_gamma| past policy warn threshold
 ```
 
 ---
@@ -202,10 +225,11 @@ def aggregate_exposure(
 ) -> HedgeExposure:
     b = [x for x in book_legs if x.symbol == symbol]
     h = [x for x in hedge_legs if x.symbol == symbol]
-    book_lots = sum(x.lots for x in b)
+    book_lots = sum(x.effective_lots for x in b)
     book_notional = sum(x.notional_inr for x in b)
     hedge_lots = sum(x.effective_lots for x in h)
     hedge_notional = sum(x.notional_inr for x in h)
+    net_gamma = sum(x.gamma_lots for x in b) + sum(x.gamma_lots for x in h)
     return HedgeExposure(
         symbol=symbol,
         asset_class=asset_class,
@@ -215,6 +239,7 @@ def aggregate_exposure(
         hedge_notional_inr=hedge_notional,
         as_of=as_of,
         contract_notes=contract_notes,
+        net_gamma=net_gamma,
     )
 
 
@@ -275,18 +300,14 @@ def band_breached(
 ) -> bool:
     if abs(drift) < band.min_lots:
         return False
-    if abs(drift) * abs(
-        exposure.book_notional_inr / exposure.book_lots if abs(exposure.book_lots) > 1e-12 else 0.0
-    ) < band.min_notional_inr:
-        # optional ₹ filter when configured
-        if band.min_notional_inr > 0:
-            npl = (
-                exposure.book_notional_inr / exposure.book_lots
-                if abs(exposure.book_lots) > 1e-12
-                else 0.0
-            )
-            if abs(drift * npl) < band.min_notional_inr:
-                return False
+    if band.min_notional_inr > 0:
+        npl = (
+            exposure.book_notional_inr / exposure.book_lots
+            if abs(exposure.book_lots) > 1e-12
+            else 0.0
+        )
+        if abs(drift * npl) < band.min_notional_inr:
+            return False
     h_act = exposure.hedge_ratio
     if h_act is None:
         return abs(drift) >= band.min_lots
@@ -301,15 +322,25 @@ def build_review_copy(
     drift_actionable: float,
     residual: float,
     regime: RegimeLabel,
+    *,
+    gamma_flag: bool = False,
 ) -> str:
     """Careful wording: review / question only — never an order instruction."""
     h_txt = f"{h_actual:.0%}" if h_actual is not None else "n/a"
     direction = "increase" if drift_actionable > 0 else "reduce" if drift_actionable < 0 else "hold"
+    gamma_bit = ""
+    if gamma_flag:
+        sign = "long" if exposure.net_gamma > 0 else "short"
+        gamma_bit = (
+            f" Net gamma is {sign} ({exposure.net_gamma:+.4f}) — delta may drift "
+            f"quickly if the underlier gaps; review residual risk."
+        )
     return (
         f"HEDGE REVIEW — not an order. {symbol}: book {exposure.book_lots:+.2f} lots, "
         f"hedge {exposure.hedge_lots:+.2f} lots, ratio {h_txt} vs target {h_star:.0%} "
         f"({regime.value}). Model drift {drift_actionable:+.2f} lots ({direction}); "
-        f"residual after step {residual:+.2f} lots. "
+        f"residual after step {residual:+.2f} lots."
+        f"{gamma_bit} "
         f"Review whether to adjust the hedge, wait for roll, or accept residual risk?"
     )
 
@@ -333,6 +364,10 @@ def evaluate_symbol(
     actionable = snap_lots(drift, symbol_policy.lot_step)
     residual = drift - actionable
     breached = band_breached(exposure, h_star, band, drift)
+    gamma_flag = (
+        symbol_policy.gamma_warn_abs > 0
+        and abs(exposure.net_gamma) >= symbol_policy.gamma_warn_abs
+    )
 
     suppress: Optional[str] = None
     if not force:
@@ -340,6 +375,7 @@ def evaluate_symbol(
             days_to_roll is not None
             and 0 <= days_to_roll <= policy.roll_blackout_days
             and not breached
+            and not gamma_flag
         ):
             suppress = "roll_blackout"
         if (
@@ -347,11 +383,13 @@ def evaluate_symbol(
             and days_since_last_prompt < policy.min_days_between_prompts
             and not force
         ):
-            suppress = suppress or "cooldown"
+            # Still allow surface if gamma_flag in Stress — implementer choice
+            if not (gamma_flag and regime == RegimeLabel.STRESS):
+                suppress = suppress or "cooldown"
 
     urgency = "none"
-    if breached and suppress is None:
-        urgency = "elevated" if regime == RegimeLabel.STRESS else "review"
+    if (breached or gamma_flag) and suppress is None:
+        urgency = "elevated" if regime == RegimeLabel.STRESS or gamma_flag else "review"
 
     h_act = exposure.hedge_ratio
     reason_parts = [
@@ -359,9 +397,18 @@ def evaluate_symbol(
         f"drift_lots={drift:.3f}",
         f"breached={breached}",
         f"regime={regime.value}",
+        f"net_gamma={exposure.net_gamma:.6f}",
+        f"gamma_flag={gamma_flag}",
     ]
     copy = build_review_copy(
-        exposure.symbol, exposure, h_star, h_act, actionable, residual, regime
+        exposure.symbol,
+        exposure,
+        h_star,
+        h_act,
+        actionable,
+        residual,
+        regime,
+        gamma_flag=gamma_flag,
     )
 
     return HedgeReview(
@@ -380,6 +427,8 @@ def evaluate_symbol(
         reason="; ".join(reason_parts),
         copy_review=copy,
         suppress_reason=suppress,
+        net_gamma=exposure.net_gamma,
+        gamma_flag=gamma_flag,
     )
 
 
@@ -407,6 +456,8 @@ def _suppressed(
         reason=why,
         copy_review="",
         suppress_reason=why,
+        net_gamma=exposure.net_gamma,
+        gamma_flag=False,
     )
 
 
@@ -442,14 +493,90 @@ def evaluate_book(
 
 ---
 
+## Gamma risk
+
+Gamma is the **rate of change of delta** with respect to the underlier:
+
+\[
+\Gamma = \frac{\partial \Delta}{\partial S}
+\]
+
+Linear instruments (spot inventory, futures) have **Γ ≈ 0**. Options have non-zero gamma, largest near ATM and near expiry. Portfolio gamma is the sum of (lots × γ per lot) across book and hedge legs — stored here as `HedgeExposure.net_gamma`.
+
+### Why delta-only hedging is incomplete
+
+A book can be **delta-flat** and still make or lose money when the underlier moves:
+
+| Net gamma | Behaviour for a discrete move in S |
+|-----------|-------------------------------------|
+| **Long gamma** (Γ > 0) | Delta becomes more long as S rises / more short as S falls — convex payoff; typically **pays theta** |
+| **Short gamma** (Γ < 0) | Delta moves against the book in a trend or gap — concave payoff; **earns theta**, dangerous in Stress |
+| **Zero gamma** | Futures-only hedges; residual risk is mainly basis, roll, and unhedged ratio — not convexity |
+
+**Short gamma + Stress regime** is the primary warning case for a personal commodity desk that sells options as “cheap hedges.”
+
+### Discrete re-hedge and gap risk
+
+Between hedge reviews, delta drifts approximately:
+
+\[
+\Delta_{t+\Delta t} \approx \Delta_t + \Gamma\,\Delta S + \cdots
+\]
+
+- Large **|Γ|** → bands on delta/lots are breached faster → more reviews (or larger residuals if you do not re-hedge).
+- **Gaps** (overnight MCX/global prints): one jump can move Δ a lot; band logic based on yesterday’s Δ understates risk if Γ is large.
+
+Advisor implication: even when `band_breached` is false on *current* marks, `gamma_flag` can still surface a **review** so the human considers residual convexity risk.
+
+### Sign and desk intuition
+
+| Position (simplified) | Gamma | Desk note |
+|-----------------------|-------|-----------|
+| Long call or long put | Long Γ | Hedge Δ will need chasing; funding via theta |
+| Short call or short put | Short Γ | Quiet until a move; then Δ runs away |
+| Long futures / inventory | ~0 Γ | Use ratio bands only |
+| Short futures hedge | ~0 Γ | Same |
+
+### MVP vs later
+
+| Phase | Gamma handling |
+|-------|----------------|
+| **v2 MVP (futures-first)** | `gamma = 0` on all legs; `net_gamma = 0`; no flags |
+| **v2.x options** | Feed vendor/model Δ and Γ into legs; set `SymbolPolicy.gamma_warn_abs`; show gamma sentence in `copy_review` |
+| **Not in scope** | Automated gamma scalping, continuous intraday re-hedge, or guaranteed neutral books |
+
+### Policy hooks (already in model)
+
+- `BookLeg.gamma` / `HedgeLeg.gamma` — per-lot gamma (0 for linear).
+- `HedgeExposure.net_gamma` — aggregate from `aggregate_exposure`.
+- `SymbolPolicy.gamma_warn_abs` — if `> 0` and `|net_gamma| ≥ threshold` → `gamma_flag`.
+- `HedgeReview.gamma_flag` / `net_gamma` — UI + journal.
+- Stress: allow gamma flags to bypass soft cooldown so convexity risk is not silenced.
+
+### Copy rules (gamma)
+
+- State fact: “net gamma is short/long (value).”
+- State consequence: “delta may drift quickly if the underlier gaps.”
+- End with **review** language — never “buy/sell X to flatten gamma now” as an order.
+
+### Tests (gamma)
+
+7. Futures-only legs → `net_gamma == 0`, `gamma_flag` false.  
+8. Short options with Γ such that `|net_gamma| ≥ gamma_warn_abs` → `gamma_flag` true and copy mentions gamma.  
+9. Gamma flag in Stress is not suppressed solely by cooldown (per policy choice above).
+
+---
+
 ## Integration notes (v2 only)
 
 | Concern | Approach |
 |---------|----------|
 | MCX roll | `contract_label` + `contract_notes` on legs; `days_to_roll` into `evaluate_symbol` |
+| Delta | `effective_lots = lots * delta`; futures delta = 1 |
+| Gamma | Optional; warn-only via `gamma_flag` — does not invent trades |
 | UI | Show `copy_review` only if `suppress_reason is None` and `urgency != "none"` |
 | Ack | Treat each non-suppressed `HedgeReview` as portfolio-relevant signal |
-| Journal | On ack, optional intended-trade: symbol, `drift_lots_actionable`, reason, regime |
+| Journal | On ack, optional intended-trade: symbol, `drift_lots_actionable`, reason, regime, `net_gamma` |
 | Equity β | Optional later: synthetic `BookLeg` from ₹ beta exposure vs Nifty futures hedge |
 | Execution | **None** — no broker client imports in this module |
 
@@ -465,6 +592,7 @@ policy = HedgeRebalancePolicy(
             h_star=0.50,
             band=RebalanceBand(min_lots=1.0, ratio_tol=0.10),
             lot_step=1.0,
+            gamma_warn_abs=0.0,  # enable when option Γ feeds exist
         ),
         SymbolPolicy(
             symbol="CRUDEOIL",
@@ -485,7 +613,10 @@ policy = HedgeRebalancePolicy(
 3. Snap to `lot_step` leaves residual.  
 4. Stress raises effective h_star and tightens band.  
 5. Cooldown / roll_blackout sets `suppress_reason`.  
-6. `copy_review` contains “not an order” and a question, not “execute”.
+6. `copy_review` contains “not an order” and a question, not “execute”.  
+7. Futures-only → `net_gamma == 0`.  
+8. Option short gamma above threshold → `gamma_flag` and gamma sentence in copy.  
+9. Stress + gamma_flag not silenced by cooldown alone.
 
 ---
 
@@ -493,9 +624,11 @@ policy = HedgeRebalancePolicy(
 
 - Broker APIs, OMS, auto-send  
 - Intraday continuous rebalancing without human ack  
+- Automated gamma scalping  
 - Full multi-asset mean-variance optimiser (optional later research)
 
 ---
 
 Drafted: 2026-08-13  
+Gamma section: 2026-08-13  
 Repo: `sanjaymaverick-cmd/portfolio`
