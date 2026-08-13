@@ -59,6 +59,13 @@ class FundamentalRepo:
             "notes": snap.notes,
         }
         if row:
+            incoming = snap.promoter_pledge
+            if (
+                incoming is not None
+                and row.promoter_pledge is not None
+                and incoming != row.promoter_pledge
+            ):
+                row.promoter_pledge_prev = row.promoter_pledge
             for key, value in payload.items():
                 setattr(row, key, value)
         else:

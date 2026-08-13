@@ -109,6 +109,14 @@ eod:
   llm_model: ""
   news_sleep_ms: 400
 
+alerts:
+  weight_pct: 12.0
+  weight_high_pct: 15.0
+  pledge_step_pp: 2.0
+  pledge_abs: 20.0
+  volume_ratio: 0.45
+  results_lookback_days: 5
+
 ui:
   compact_threshold_lakhs: 10
   default_page_size: 200

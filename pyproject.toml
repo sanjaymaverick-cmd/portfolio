@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "meridian"
-version = "0.7.0"
+version = "0.8.0"
 description = "Institutional-grade personal equity advisor and monitor for Indian markets."
 readme = "README.md"
 requires-python = ">=3.11"

@@ -19,3 +19,6 @@ def test_desk_pages_render() -> None:
     eod = client.get("/api/eod/movers")
     assert eod.status_code == 200
     assert "movers" in eod.json()
+    alerts = client.get("/api/alerts")
+    assert alerts.status_code == 200
+    assert "open" in alerts.json()

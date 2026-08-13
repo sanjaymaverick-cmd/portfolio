@@ -49,9 +49,11 @@ meridian/
 5. **Done.** Regime sensors + hysteresis. Ownership + Sentiment from Screener shareholding / analysis. Regime-weighted five-factor composite and actions.
 6. **Done.** Regime-conditioned SHAP (TreeExplainer surrogate, linear fallback) · stored reasoning and portfolio notes.
 7. **Done.** End-of-day price–news impact: movers, same-day news + filings, lexicon filter, rules (optional LLM) attribution.
-8. Polish · alerts · packaging.
+8. **Done.** Alerts (weight, pledge, volume dry-up, results tape, action flip, regime shift) · watchlist · Windows packaging.
 
-Page loads never block on the network. Explicit jobs: `prices`, `fundamentals`, `risk`, `regime`, `score`, `eod`.
+Page loads never block on the network. Explicit jobs: `prices`, `fundamentals`, `risk`, `regime`, `score`, `eod`, `alerts`.
+
+Command’s gold rail shows at most three open alerts. The Alerts page lists the rest with the name’s last SHAP note. Delivery % is not on the yfinance tape — volume versus recent average is the dry-up proxy. Results come from stored EOD headlines tagged `Results`, not a corporate calendar. `python -m meridian desktop` opens pywebview; `scripts/package-windows.ps1` builds `dist/MERIDIAN`.
 
 ## Phase 7 — EOD attribution
 

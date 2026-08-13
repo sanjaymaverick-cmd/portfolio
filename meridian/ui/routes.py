@@ -28,7 +28,10 @@ from meridian.storage.regime import RegimeRepo
 from meridian.storage.risk import RiskRepo
 from meridian.storage.attributions import AttributionRepo
 from meridian.storage.eod import EodRepo, decode_list
+from meridian.storage.alerts import AlertRepo, WatchRepo
+from meridian.recommendations.alert_service import AlertService
 from meridian.recommendations.eod_service import EodService
+from meridian.domain.symbols import normalize_symbol
 from meridian.ui.charts import price_chart_html, risk_chart_html, shap_bar_html, sparkline
 from meridian.ui.formatters import FILTERS
 
@@ -125,6 +128,7 @@ def command(request: Request, session: Session = Depends(db_session)) -> HTMLRes
             movers=movers,
             eod_cards=eod_cards,
             eod_as_of=eod_as_of,
+            open_alerts=_refresh_alerts(session, views, limit=3),
             jobs=ImportRepo(session).recent(5),
         ),
     )
@@ -290,6 +294,27 @@ def _eod_cards(session: Session, views) -> tuple[list[dict[str, Any]], datetime 
             }
         )
     return cards, day
+
+
+def _refresh_alerts(session: Session, views, *, limit: int | None = None) -> list[dict[str, Any]]:  # noqa: ANN001
+    AlertService(session).evaluate()
+    ids = {view.symbol: view.id for view in views}
+    out: list[dict[str, Any]] = []
+    for row in AlertRepo(session).open_alerts(limit=limit):
+        out.append(
+            {
+                "id": row.id,
+                "kind": row.kind,
+                "symbol": row.symbol,
+                "severity": row.severity,
+                "title": row.title,
+                "detail": row.detail,
+                "shap_note": row.shap_note,
+                "action": row.action,
+                "holding_id": ids.get(row.symbol),
+            }
+        )
+    return out
 
 
 def _eod_timeline(session: Session, symbol: str) -> list[dict[str, Any]]:
@@ -475,9 +500,56 @@ def refresh_eod(
 
 @router.get("/alerts", response_class=HTMLResponse)
 def alerts_page(request: Request, session: Session = Depends(db_session)) -> HTMLResponse:
+    repo = HoldingRepo(session)
+    views = [repo.to_view(row) for row in repo.list()]
+    open_alerts = _refresh_alerts(session, views)
+    history = AlertRepo(session).recent(limit=30)
     return templates.TemplateResponse(
-        request, "alerts.html", _ctx(request, session, active="alerts")
+        request,
+        "alerts.html",
+        _ctx(
+            request,
+            session,
+            active="alerts",
+            open_alerts=open_alerts,
+            history=history,
+            watchlist=WatchRepo(session).list(),
+            alert_cfg=get_settings().alerts,
+        ),
     )
+
+
+@router.post("/alerts/refresh")
+def refresh_alerts_form(
+    session: Session = Depends(db_session),
+    next_url: str = Form("/alerts"),
+) -> RedirectResponse:
+    AlertService(session).evaluate()
+    target = next_url if next_url.startswith("/") else "/alerts"
+    return RedirectResponse(target, status_code=303)
+
+
+@router.post("/alerts/{alert_id}/ack")
+def ack_alert(alert_id: int, session: Session = Depends(db_session)) -> RedirectResponse:
+    AlertRepo(session).ack(alert_id)
+    return RedirectResponse("/alerts", status_code=303)
+
+
+@router.post("/watchlist")
+def add_watch(
+    session: Session = Depends(db_session),
+    symbol: str = Form(...),
+    note: str = Form(""),
+) -> RedirectResponse:
+    parsed = normalize_symbol(symbol)
+    WatchRepo(session).add(parsed.symbol, note=note or None)
+    return RedirectResponse("/alerts", status_code=303)
+
+
+@router.post("/watchlist/{symbol}/delete")
+def drop_watch(symbol: str, session: Session = Depends(db_session)) -> RedirectResponse:
+    WatchRepo(session).remove(symbol)
+    return RedirectResponse("/alerts", status_code=303)
 
 
 @router.get("/settings", response_class=HTMLResponse)

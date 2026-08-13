@@ -378,6 +378,42 @@ summary {
   text-transform: uppercase;
 }
 
+.alert-rail .rail-more {
+  margin-left: auto;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+.alert-rail .sev-high { color: var(--stress); }
+.alert-rail .sev-watch { color: var(--ivory); }
+.alert-rail .sev-info { color: var(--mist); }
+
+.alert-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.alert-card header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.alert-card .kind {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ash);
+}
+
+.alert-card.sev-high { border-left: 1px solid var(--stress); }
+.alert-card.sev-watch { border-left: 1px solid var(--gold-dim); }
+
 .movers-block { margin-bottom: var(--space-5); }
 
 .mover-grid {
