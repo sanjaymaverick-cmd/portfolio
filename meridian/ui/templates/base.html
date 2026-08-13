@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ app_name }} · {% block title %}Command{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/meridian.css">
+</head>
+<body class="{{ theme }}">
+  <header class="mast">
+    <a class="brand" href="/">
+      <svg class="mark" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M3 16.5C7.2 9.8 10.8 7.2 21 6" stroke="currentColor" stroke-width="1.2"/>
+        <circle cx="12" cy="12" r="1.4" fill="currentColor"/>
+      </svg>
+      <span class="wordmark">{{ app_name }}</span>
+    </a>
+    <nav class="desk-nav" aria-label="Desk">
+      <a href="/" class="{{ 'active' if active == 'command' else '' }}">Command</a>
+      <a href="/holdings" class="{{ 'active' if active == 'holdings' else '' }}">Holdings</a>
+      <a href="/risk" class="{{ 'active' if active == 'risk' else '' }}">Risk</a>
+      <a href="/alerts" class="{{ 'active' if active == 'alerts' else '' }}">Alerts</a>
+      <a href="/import" class="{{ 'active' if active == 'import' else '' }}">Import</a>
+      <a href="/settings" class="{{ 'active' if active == 'settings' else '' }}">Desk</a>
+    </nav>
+    <div class="mast-meta">
+      <span class="regime {{ regime.tone }}"><span class="dot"></span>{{ regime.label }}</span>
+      {% if tape and tape.nifty_last is not none %}
+      <span class="num">Nifty {{ '%.0f'|format(tape.nifty_last|float) }}
+        <span class="{{ tape.nifty_chg|sclass }}">{{ tape.nifty_chg|pct }}</span>
+      </span>
+      {% endif %}
+      <span class="num {% if tape and tape.stale %}stale{% endif %}">
+        {% if tape and tape.last_ok %}Tape {{ tape.last_ok.strftime('%d %b %H:%M') }}{% else %}Tape —{% endif %}
+      </span>
+      <span class="num">{{ now.strftime('%d %b %Y  %H:%M') }}</span>
+    </div>
+  </header>
+
+  <div class="shell">
+    <aside class="rail">
+      <section>
+        <h2>Accounts</h2>
+        <div class="account-list">
+          <a href="{{ request.url.path }}" class="{{ 'active' if not account_id else '' }}">
+            <span>Consolidated</span>
+            <span class="meta">{{ accounts|length }}</span>
+          </a>
+          {% for acc in accounts %}
+          <a href="{{ request.url.path }}?account={{ acc.id }}" class="{{ 'active' if account_id == acc.id else '' }}">
+            <span>{{ acc.name }}</span>
+            <span class="meta">{{ acc.holding_count }}</span>
+          </a>
+          {% endfor %}
+        </div>
+      </section>
+      <div class="rail-actions">
+        <form method="post" action="/tape/refresh">
+          <input type="hidden" name="next_url" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
+          <input type="hidden" name="force" value="1">
+          <button class="btn primary" type="submit">Mark to market</button>
+        </form>
+        <a class="btn" href="/import">Import statement</a>
+        <button class="btn" type="button" data-open="manual">Add position</button>
+      </div>
+    </aside>
+    <main class="stage">
+      {% block stage %}{% endblock %}
+    </main>
+  </div>
+
+  <footer class="colophon">
+    <span>Advisory only · no execution</span>
+    <span>{{ subtitle }}</span>
+    <span>Local book · yfinance tape</span>
+  </footer>
+  <script src="/vendor/plotly.min.js"></script>
+
+  <dialog id="manual">
+    <form method="post" action="/holdings/manual" class="stack">
+      <h2 class="kicker">Manual position</h2>
+      <div class="form-grid">
+        <label>Account
+          <input name="account_name" required value="{{ accounts[0].name if accounts else 'Core' }}">
+        </label>
+        <label>Exchange
+          <select name="exchange">
+            <option>NSE</option>
+            <option>BSE</option>
+          </select>
+        </label>
+        <label>Symbol
+          <input name="symbol" required placeholder="RELIANCE">
+        </label>
+        <label>Company
+          <input name="company_name" placeholder="Optional">
+        </label>
+        <label>Quantity
+          <input name="quantity" required>
+        </label>
+        <label>Avg cost (₹)
+          <input name="avg_cost" required>
+        </label>
+        <label>Last price (₹)
+          <input name="last_price">
+        </label>
+      </div>
+      <p style="display:flex;gap:8px;margin-top:16px;">
+        <button class="btn primary" type="submit">Book</button>
+        <button class="btn" type="button" data-close="manual">Cancel</button>
+      </p>
+    </form>
+  </dialog>
+  <script src="/static/js/meridian.js"></script>
+</body>
+</html>

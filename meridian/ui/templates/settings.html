@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Desk{% endblock %}
+{% block stage %}
+  <div class="page-head">
+    <div>
+      <h1>Desk</h1>
+      <p>Local configuration. The tape calls Yahoo Finance only when you mark to market.</p>
+    </div>
+  </div>
+  <div class="detail-grid">
+    <div class="panel">
+      <h3>New account</h3>
+      <form method="post" action="/accounts" class="form-grid">
+        <label>Name<input name="name" required placeholder="Core — Zerodha"></label>
+        <label>Broker
+          <select name="broker">
+            <option value="zerodha">Zerodha</option>
+            <option value="angel_one">Angel One</option>
+            <option value="dhan">Dhan</option>
+            <option value="icici">ICICI Direct</option>
+            <option value="groww">Groww</option>
+            <option value="upstox">Upstox</option>
+            <option value="generic">Other</option>
+          </select>
+        </label>
+        <label>Client id<input name="client_id" placeholder="Optional"></label>
+        <div style="align-self:end"><button class="btn primary" type="submit">Create</button></div>
+      </form>
+    </div>
+    <div>
+      <div class="panel" style="margin-bottom:12px">
+        <h3>Paths</h3>
+        <dl class="kv">
+          <dt>Database</dt><dd class="num">{{ db_path }}</dd>
+          <dt>Host</dt><dd class="num">{{ settings.app.host }}:{{ settings.app.port }}</dd>
+          <dt>Theme</dt><dd>{{ settings.app.theme }}</dd>
+          <dt>Tape TTL</dt><dd class="num">{{ settings.providers.price_ttl_minutes }} min</dd>
+          <dt>Last mark</dt><dd class="num">{% if tape.last_ok %}{{ tape.last_ok.strftime('%d %b %Y %H:%M') }}{% else %}never{% endif %}</dd>
+        </dl>
+      </div>
+      <div class="panel">
+        <h3>Demonstration book</h3>
+        <p class="reasoning">Seventeen lines across two accounts. Used only when the book is empty, unless you force a later reset from the CLI.</p>
+        <form method="post" action="/settings/seed" style="margin-top:12px">
+          <button class="btn" type="submit">Load demonstration book</button>
+        </form>
+      </div>
+    </div>
+  </div>
+{% endblock %}

@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Import{% endblock %}
+{% block stage %}
+  <div class="page-head">
+    <div>
+      <h1>Import statement</h1>
+      <p>Zerodha, Angel One, Dhan, ICICI Direct, Groww, Upstox — CSV, Excel, or PDF.</p>
+    </div>
+  </div>
+
+  <div class="detail-grid">
+    <div class="panel">
+      <h3>Statement</h3>
+      <form method="post" action="/import/preview" enctype="multipart/form-data">
+        <div class="drop">
+          <p>Holdings file</p>
+          <input type="file" name="statement" accept=".csv,.txt,.xlsx,.xls,.xlsm,.pdf" required>
+        </div>
+        <p style="margin-top:12px"><button class="btn primary" type="submit">Read file</button></p>
+      </form>
+
+      {% if preview %}
+      <hr style="border:0;border-top:1px solid var(--line);margin:20px 0">
+      <p class="mist">Detected <strong>{{ preview.broker }}</strong> · {{ preview.accepted }} accepted · {{ preview.rejected }} rejected</p>
+      <form method="post" action="/import/commit" class="form-grid" style="margin-top:12px">
+        <input type="hidden" name="token" value="{{ preview_token }}">
+        <label>Book into account
+          <input name="account_name" required value="{{ accounts[0].name if accounts else 'Core — Import' }}">
+        </label>
+        <label>Broker
+          <select name="broker">
+            {% for b in ['zerodha','angel_one','dhan','icici','groww','upstox','generic'] %}
+            <option value="{{ b }}" {{ 'selected' if preview.broker == b else '' }}>{{ b }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <div style="grid-column:1/-1">
+          <button class="btn primary" type="submit">Commit to book</button>
+        </div>
+      </form>
+      <div class="preview-table" style="margin-top:16px">
+        <table class="book">
+          <thead>
+            <tr><th>Symbol</th><th class="r">Qty</th><th class="r">Avg</th><th class="r">LTP</th><th>Status</th></tr>
+          </thead>
+          <tbody>
+            {% for row in preview.rows[:80] %}
+            <tr>
+              <td class="sym">{{ row.symbol }}</td>
+              <td class="r num">{{ row.quantity|qty }}</td>
+              <td class="r num">{{ row.avg_cost|inr }}</td>
+              <td class="r num">{{ row.last_price|inr }}</td>
+              <td class="{{ 'down' if row.error else 'up' }}">{{ row.error or 'ok' }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="muted" style="margin-top:10px;font-size:11px">
+        Mapping:
+        {% for field, header in preview.mapping.items() %}
+          {{ field }}←{{ header }}{% if not loop.last %} · {% endif %}
+        {% endfor %}
+      </p>
+      {% endif %}
+    </div>
+
+    <div>
+      <div class="panel" style="margin-bottom:12px">
+        <h3>Expected columns</h3>
+        <p class="reasoning">Symbol, quantity, and average cost are required. Last price, company, ISIN, and sector are taken when present. Unknown layouts are mapped by header aliases — if a file fails, rename the header row to those names.</p>
+        <dl class="kv" style="margin-top:12px">
+          {% for field, aliases in field_aliases.items() %}
+          <dt>{{ field }}</dt>
+          <dd class="muted">{{ aliases[0] }}</dd>
+          {% endfor %}
+        </dl>
+      </div>
+      <div class="panel">
+        <h3>Recent imports</h3>
+        {% if jobs %}
+        <dl class="kv">
+          {% for job in jobs %}
+          <dt>{{ job.filename }}</dt>
+          <dd class="num">{{ job.accepted }}/{{ job.accepted + job.rejected }} · {{ job.broker }}</dd>
+          {% endfor %}
+        </dl>
+        {% else %}
+        <p class="muted">No statements committed yet.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+{% endblock %}

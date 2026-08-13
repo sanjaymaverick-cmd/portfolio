@@ -1,0 +1,45 @@
+app:
+  name: MERIDIAN
+  subtitle: Equity Advisory Desk · India
+  host: 127.0.0.1
+  port: 8787
+  theme: dark
+  open_browser: true
+
+paths:
+  data_dir: data
+  db_filename: meridian.db
+  cache_dir: data/cache
+  import_dir: data/imports
+  log_dir: logs
+
+market:
+  primary_exchange: NSE
+  secondary_exchange: BSE
+  nifty_ticker: "^NSEI"
+  vix_ticker: "^INDIAVIX"
+  currency: INR
+  correlation_window: 60
+  ewma_lambda: 0.94
+
+providers:
+  yfinance_enabled: true
+  screener_ttl_hours: 24
+  price_ttl_minutes: 15
+  history_days: 220
+  news_ttl_minutes: 30
+  request_sleep_ms: 400
+  batch_size: 8
+
+regime:
+  mode: rules          # rules | soft | hmm
+  vix_elevated: 16.0
+  vix_stress: 22.0
+
+scoring:
+  scale_min: 0
+  scale_max: 10
+
+ui:
+  compact_threshold_lakhs: 10
+  default_page_size: 200

@@ -1,0 +1,60 @@
+<div class="table-wrap">
+  {% if tools %}
+  <form class="table-tools" method="get" action="/holdings">
+    <input type="search" name="q" value="{{ query }}" placeholder="Symbol or name">
+    <select name="sector">
+      <option value="all">All sectors</option>
+      {% for s in sectors %}
+      <option value="{{ s }}" {{ 'selected' if sector == s else '' }}>{{ s }}</option>
+      {% endfor %}
+    </select>
+    {% if account_id %}<input type="hidden" name="account" value="{{ account_id }}">{% endif %}
+    <button class="btn" type="submit">Filter</button>
+    <span class="muted num" style="margin-left:auto">{{ holdings|length }} lines</span>
+  </form>
+  {% endif %}
+  <table class="book">
+    <thead>
+      <tr>
+        <th>Symbol</th>
+        <th>Name</th>
+        <th>Acct</th>
+        <th>Sector</th>
+        <th class="r">Qty</th>
+        <th class="r">Avg</th>
+        <th class="r">LTP</th>
+        <th></th>
+        <th class="r">Day</th>
+        <th class="r">Invested</th>
+        <th class="r">Value</th>
+        <th class="r">P&amp;L</th>
+        <th class="r">%</th>
+        <th>Rec</th>
+        <th class="r">Score</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for h in holdings %}
+      <tr>
+        <td class="sym"><a class="row-link" href="/holdings/{{ h.id }}">{{ h.symbol }}</a></td>
+        <td class="name">{{ h.company_name }}</td>
+        <td class="muted">{{ h.account_name.split('—')[0] }}</td>
+        <td class="muted">{{ h.sector }}</td>
+        <td class="r num">{{ h.quantity|qty }}</td>
+        <td class="r num">{{ h.avg_cost|inr }}</td>
+        <td class="r num">{{ h.last_price|inr }}</td>
+        <td class="spark-cell">{{ h.spark|safe }}</td>
+        <td class="r num {{ h.day_pnl_pct|sclass }}">{{ h.day_pnl_pct|pct }}</td>
+        <td class="r num">{{ h.invested|inr_c }}</td>
+        <td class="r num">{{ h.market_value|inr_c }}</td>
+        <td class="r num {{ h.pnl|sclass }}">{{ h.pnl|inr_s }}</td>
+        <td class="r num {{ h.pnl_pct|sclass }}">{{ h.pnl_pct|pct }}</td>
+        <td><span class="badge hold">{{ h.recommendation }}</span></td>
+        <td class="r muted">{{ h.score if h.score is not none else '—' }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="15" class="empty">No holdings in this view.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>

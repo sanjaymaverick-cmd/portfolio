@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}{{ holding.symbol }}{% endblock %}
+{% block stage %}
+  <div class="identity">
+    <div>
+      <h1>{{ holding.symbol }}</h1>
+      <p class="mist">{{ holding.company_name }} · {{ holding.exchange }} · {{ holding.sector }} · {{ holding.mcap }} · {{ holding.yahoo }}</p>
+    </div>
+    <div style="text-align:right">
+      <span class="badge hold">Unscored</span>
+      <p class="muted" style="margin:8px 0 0">Weight {{ weight|pct if weight is not none else '—' }} of book</p>
+    </div>
+  </div>
+
+  <div class="detail-grid">
+    <div>
+      <div class="panel" style="margin-bottom:12px">
+        <h3>Price · {{ bar_count }} sessions</h3>
+        {% if chart_html %}
+        <div class="chart-frame">{{ chart_html|safe }}</div>
+        {% else %}
+        <div class="placeholder">No OHLCV yet — mark the book to market</div>
+        {% endif %}
+      </div>
+      <div class="panel" style="margin-bottom:12px">
+        <h3>Rolling ρ and EWMA β vs Nifty</h3>
+        <div class="placeholder">Dual-axis risk series · Phase 4</div>
+      </div>
+      <div class="panel">
+        <h3>Ownership</h3>
+        <div class="placeholder">Promoter · FII · DII · Phase 3</div>
+      </div>
+    </div>
+    <div>
+      <div class="panel" style="margin-bottom:12px">
+        <h3>Factor scores</h3>
+        <div class="factor-list">
+          {% for name in ['Quality','Valuation','Momentum','Ownership','Sentiment'] %}
+          <div>
+            <span>{{ name }}</span>
+            <div class="track"><span style="width:0%"></span></div>
+            <span class="num muted">—</span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="panel" style="margin-bottom:12px">
+        <h3>Recommendation</h3>
+        <p class="reasoning">
+          {{ holding.symbol }} is on the book at {{ holding.quantity|qty }} shares,
+          average {{ holding.avg_cost|inr }} against last mark {{ holding.last_price|inr }}.
+          Unrealised P&amp;L is <span class="{{ holding.pnl|sclass }}">{{ holding.pnl|inr_s }}
+          ({{ holding.pnl_pct|pct }})</span>.
+          Session P&amp;L vs prior close is
+          <span class="{{ holding.day_pnl|sclass }}">{{ holding.day_pnl|inr_s }} ({{ holding.day_pnl_pct|pct }})</span>.
+          Factor scores, regime-conditioned SHAP, and an action will appear here from Phase 6.
+          Until then this page is the marked lot — not advice.
+        </p>
+      </div>
+      <div class="panel" style="margin-bottom:12px">
+        <h3>Lot</h3>
+        <dl class="kv">
+          <dt>Account</dt><dd>{{ holding.account_name }}</dd>
+          <dt>Quantity</dt><dd class="num">{{ holding.quantity|qty }}</dd>
+          <dt>Average cost</dt><dd class="num">{{ holding.avg_cost|inr }}</dd>
+          <dt>Last price</dt><dd class="num">{{ holding.last_price|inr }}</dd>
+          <dt>Prior close</dt><dd class="num">{{ holding.prev_close|inr }}</dd>
+          <dt>Day P&amp;L</dt><dd class="num {{ holding.day_pnl|sclass }}">{{ holding.day_pnl|inr_s }}</dd>
+          <dt>Invested</dt><dd class="num">{{ holding.invested|inr }}</dd>
+          <dt>Market value</dt><dd class="num">{{ holding.market_value|inr }}</dd>
+          <dt>P&amp;L</dt><dd class="num {{ holding.pnl|sclass }}">{{ holding.pnl|inr_s }}</dd>
+          <dt>As of</dt><dd class="num">{% if holding.price_asof %}{{ holding.price_asof.strftime('%d %b %Y') }}{% else %}—{% endif %}</dd>
+        </dl>
+        <form method="post" action="/holdings/{{ holding.id }}/edit" class="form-grid" style="margin-top:14px">
+          <label>Quantity<input name="quantity" value="{{ holding.quantity }}"></label>
+          <label>Avg cost<input name="avg_cost" value="{{ holding.avg_cost }}"></label>
+          <label>Last price<input name="last_price" value="{{ holding.last_price or '' }}"></label>
+          <label>Notes<input name="notes" value="{{ holding.notes or '' }}"></label>
+          <div style="display:flex;gap:8px;align-items:end">
+            <button class="btn primary" type="submit">Update lot</button>
+          </div>
+        </form>
+        <form method="post" action="/holdings/{{ holding.id }}/delete" style="margin-top:10px" onsubmit="return confirm('Remove this line from the book?')">
+          <button class="btn danger" type="submit">Remove</button>
+        </form>
+      </div>
+    </div>
+  </div>
+{% endblock %}

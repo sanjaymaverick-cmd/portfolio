@@ -1,0 +1,26 @@
+(() => {
+  const open = (id) => document.getElementById(id)?.showModal();
+  const close = (id) => document.getElementById(id)?.close();
+
+  document.querySelectorAll("[data-open]").forEach((el) => {
+    el.addEventListener("click", () => open(el.dataset.open));
+  });
+  document.querySelectorAll("[data-close]").forEach((el) => {
+    el.addEventListener("click", () => close(el.dataset.close));
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.target.matches("input, textarea, select")) return;
+    if (event.key === "i" && !event.metaKey && !event.ctrlKey) {
+      window.location.href = "/import";
+    }
+    if (event.key === "g") {
+      const once = (e) => {
+        const map = { d: "/", h: "/holdings", r: "/risk", a: "/alerts", s: "/settings" };
+        if (map[e.key]) window.location.href = map[e.key];
+        document.removeEventListener("keydown", once);
+      };
+      document.addEventListener("keydown", once);
+    }
+  });
+})();

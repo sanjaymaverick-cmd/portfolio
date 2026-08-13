@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Holdings{% endblock %}
+{% block stage %}
+  <div class="page-head">
+    <div>
+      <h1>Holdings</h1>
+      <p>{{ book.names }} lines · {{ book.market_value|inr_c }} · day {{ book.day_pnl|inr_s }}</p>
+    </div>
+    <button class="btn primary" type="button" data-open="manual">Add position</button>
+  </div>
+  {% include "partials/hero.html" %}
+  {% set tools = true %}
+  {% include "partials/table.html" %}
+{% endblock %}

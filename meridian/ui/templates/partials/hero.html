@@ -1,0 +1,29 @@
+<section class="hero">
+  <div class="metric">
+    <div class="label">Market value</div>
+    <div class="value num">{{ book.market_value|inr_c }}</div>
+    <div class="sub">{{ book.names }} names · {{ book.accounts }} accounts</div>
+  </div>
+  <div class="metric">
+    <div class="label">Invested</div>
+    <div class="value num">{{ book.invested|inr_c }}</div>
+    <div class="sub">Book cost</div>
+  </div>
+  <div class="metric">
+    <div class="label">Unrealised P&amp;L</div>
+    <div class="value num {{ book.pnl|sclass }}">{{ book.pnl|inr_s }}</div>
+    <div class="sub {{ book.pnl_pct|sclass }}">{{ book.pnl_pct|pct }}</div>
+  </div>
+  <div class="metric">
+    <div class="label">Day P&amp;L</div>
+    <div class="value num {{ book.day_pnl|sclass }}">{{ book.day_pnl|inr_s }}</div>
+    <div class="sub {{ book.day_pnl_pct|sclass }}">
+      {% if book.day_undefined %}No prior close{% else %}{{ book.day_pnl_pct|pct }} vs prior close{% endif %}
+    </div>
+  </div>
+  <div class="metric">
+    <div class="label">Largest weight</div>
+    <div class="value num">{{ book.top_weight|pct if book.top_weight is not none else '—' }}</div>
+    <div class="sub">{{ book.top_symbol or '—' }}</div>
+  </div>
+</section>
