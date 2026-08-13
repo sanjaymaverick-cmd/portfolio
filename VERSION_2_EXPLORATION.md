@@ -6,7 +6,7 @@ Do **not** implement items in this file until Meridian **v1** (Phases 3–8 / cu
 
 **Locked product answers** to the research questions below live in **`VERSION_2_DECISIONS.md`** (watchlist cap, MCX roll, signal ack, hedge reminder wording, success metrics).
 
-Related: `VERSION_2_TODO.md` (pillars), `VERSION_2_DECISIONS.md` (locked answers).
+Related: `VERSION_2_TODO.md` (pillars), `VERSION_2_DECISIONS.md` (locked answers), `docs/v2/HEDGE_REBALANCE_SKETCH.md` (pure hedge review math).
 
 ---
 
@@ -87,6 +87,14 @@ Everything below should either **extend those pillars** or stay **v3+** if it th
 
 **Fits:** trust; small feature, large practical value.
 
+### 9. Algorithmic hedge rebalancing (review-only)
+
+- Threshold / regime-scaled hedge targets vs MCX-aware exposures
+- Emit **HedgeReview** prompts (ack + journal); **no** execution
+- Design sketch: **`docs/v2/HEDGE_REBALANCE_SKETCH.md`** (`HedgeExposure`, `HedgeRebalancePolicy`, pure functions)
+
+**Fits:** locked decisions on MCX roll, hedge wording, post-mortems.
+
 ---
 
 ## Explore lightly / keep optional
@@ -123,8 +131,9 @@ Aligned with `VERSION_2_DECISIONS.md`:
 3. Signal families + **explicit acknowledge** queue
 4. Intended-trade notes → journal (**post-mortem** spine)
 5. FX context + hedge **review** prompts (careful wording, no execution)
-6. Event calendar, alerts, stress stubs as time allows
-7. Peers, weekly timeframe, export brief
+6. Hedge exposure aggregation + threshold policy (`docs/v2/HEDGE_REBALANCE_SKETCH.md`)
+7. Event calendar, alerts, stress stubs as time allows
+8. Peers, weekly timeframe, export brief
 
 ---
 
@@ -150,4 +159,4 @@ See **`VERSION_2_DECISIONS.md`** for full locked text. Summary:
 
 Last updated: 2026-08-13  
 Repo: `sanjaymaverick-cmd/portfolio`  
-Companions: `VERSION_2_TODO.md`, `VERSION_2_DECISIONS.md`
+Companions: `VERSION_2_TODO.md`, `VERSION_2_DECISIONS.md`, `docs/v2/HEDGE_REBALANCE_SKETCH.md`
