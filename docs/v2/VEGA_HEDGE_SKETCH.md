@@ -338,11 +338,96 @@ Do **not** merge prompt streams. Always set `policy_kind`.
 
 ---
 
+## Execution loop (human)
+
+Meridian **sizes and prompts**; the human **executes at the broker**. No OMS, SmartAPI, or auto-send from this module.
+
+### Layers
+
+| Layer | Owner | Output |
+|-------|--------|--------|
+| Decision / sizing | Meridian | `VegaReview` — option lots, futures Δ clean-up, copy |
+| Market execution | Human + broker/terminal | Live option and futures fills |
+| Record / learn | Meridian journal | Intent ↔ fills ↔ residual ν / IV |
+
+### Step sequence
+
+```text
+1. Fresh marks + Greeks (mute actionable lots if stale)
+2. aggregate_vega → evaluate_vega → VEGA REVIEW when warranted
+3. Explicit Acknowledge (Accept / Dismiss / Snooze)
+4. Optional intended-trade: contract label, side, lots, ref mid/IV, policy_kind=vega_defense
+5. Human trades options first (changes ν), then futures (cleans Δ)
+   — or accepts temporary Δ risk if legging the other way
+6. Log actual fills (partials allowed; link to intent id)
+7. Re-mark Greeks → residual net_vega / Δ → new review only if still offside
+```
+
+### What is executed
+
+| Leg | Purpose |
+|-----|---------|
+| **Options** | Only instrument that changes **vega** (sell to cut long ν; buy to cover short ν) |
+| **Futures** | Residual **delta** after option fills; does **not** hedge vega |
+
+Strike/expiry structure is a **human** choice; pass that contract’s `hedge_vega_per_lot` into sizing before acking.
+
+### Desk tactics (outside the app)
+
+| Situation | Bias |
+|-----------|------|
+| Short ν + Stress / hard limit | Take liquidity on options; finish risk reduction |
+| Long ν, soft warn, Calm | Passive or **no** trade if still under harvest mandate |
+| Large size vs depth | Scale; journal each fill or average |
+| Wrong tool | Futures-only cannot fix vega — do not pretend it does |
+
+### Journal fields for execution support
+
+**Intent (at ack):** `policy_kind`, symbol, suggested/chosen `contract_label`, `opt_lots`, `fut_lots`, `net_vega`, `iv_ref`, `ref_mid` (optional), `mark_time`, reason  
+
+**Fill:** time, contract, side, lots, price, fees, `instrument_type` (`option` \| `future`), `intent_id`  
+
+**After re-mark:** `net_vega_after`, `iv_after`, optional shortfall vs `ref_mid`
+
+Simple shortfall stub (desk metric, not OMS):
+
+\[
+\text{shortfall} \approx (p_{\text{fill}} - p_{\text{ref}}) \times \text{signed qty}
+\]
+
+### Priority when multiple policies fire
+
+| Conflict | Prefer |
+|----------|--------|
+| Short ν + Stress | **Vega defense** options, then Δ clean-up |
+| Long ν under limit + Δ band | **Vol harvest** futures only — no vega flatten |
+| Inventory \(h^*\) only | **Inventory** futures — leave ν alone |
+| All three | **Separate acks**; never one mixed ticket |
+
+### Human checklist
+
+1. Greeks timestamp acceptable?  
+2. Correct **policy** (defense vs harvest)?  
+3. Contract matches intent label?  
+4. Size vs depth / comfort?  
+5. Options then futures (or accepted Δ risk)?  
+6. Fills logged before leaving the desk?  
+7. Re-mark residual ν?
+
+### Execution non-goals
+
+- Order routing, algo slicing, auto-retry  
+- Guaranteed fill at model mid  
+- Combined inventory + scalp + vega ticket without tags  
+
+---
+
 ## Journal / post-mortem
 
 - Intent: `policy_kind`, opt/fut lots, `net_vega` before, `iv` before  
 - Fills: contract, side, lots, price, fees, link to intent  
 - Stub: `vega_pnl_est ≈ net_vega_avg * (iv_after - iv_before)` in consistent units  
+- Optional: execution shortfall vs ref mid at ack  
 
 ---
 
@@ -379,4 +464,5 @@ Mute actionable lots if Greeks are stale.
 ---
 
 Drafted: 2026-08-13  
+Execution loop section: 2026-08-13  
 Repo: `sanjaymaverick-cmd/portfolio`
