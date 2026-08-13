@@ -4,9 +4,9 @@
 
 Do **not** implement items in this file until Meridian **v1** (Phases 3–8 / current build plan in `ARCHITECTURE.md`) is complete and stable.
 
-This document captures **what else is worth exploring for Version 2** beyond the committed pillars in `VERSION_2_TODO.md`. It is not a backlog of tickets. Prefer updating this file over starting code.
+**Locked product answers** to the research questions below live in **`VERSION_2_DECISIONS.md`** (watchlist cap, MCX roll, signal ack, hedge reminder wording, success metrics).
 
-Related: `VERSION_2_TODO.md` (watchlist / commodities, FX context, signal-only algorithms).
+Related: `VERSION_2_TODO.md` (pillars), `VERSION_2_DECISIONS.md` (locked answers).
 
 ---
 
@@ -36,7 +36,7 @@ Everything below should either **extend those pillars** or stay **v3+** if it th
 - Track hypothetical P&L vs the actual book (learning loop)
 - Still **zero** order routing
 
-**Fits:** signals + watchlist. Low risk, high learning value.
+**Fits:** signals + watchlist. Low risk, high learning value. **Elevated by decisions:** primary metric = post-mortems; ack → optional intended-trade note.
 
 ### 2. Multi-timeframe context
 
@@ -116,25 +116,27 @@ See also the non-goals section in `VERSION_2_TODO.md`.
 
 ## Suggested exploration order (only after v1 is tagged)
 
-1. Watchlist schema + UI (stocks first, commodities second)
-2. USDINR + one commodity (e.g. gold) as context tiles
-3. Two or three signal families reusing v1 scores + regime (document parameters)
-4. Intended-trade journal linked to signals
-5. Event calendar + alert rules
-6. Stress stub on the Risk page
-7. Only then: peers, weekly timeframe, export brief
+Aligned with `VERSION_2_DECISIONS.md`:
 
-This order maximises reuse of v1 (regime, factors, β, EOD attribution) and avoids building a second product.
+1. Watchlist active/archived + soft cap (~50)
+2. MCX commodity marks + **roll machinery**
+3. Signal families + **explicit acknowledge** queue
+4. Intended-trade notes → journal (**post-mortem** spine)
+5. FX context + hedge **review** prompts (careful wording, no execution)
+6. Event calendar, alerts, stress stubs as time allows
+7. Peers, weekly timeframe, export brief
 
 ---
 
-## Research questions before any v2 code
+## Research questions — ANSWERED
 
-1. **Watchlist size** — tens of names or hundreds? (cache and Screener rate limits)
-2. **Commodities** — domestic continuous proxies vs international symbols via existing free price paths only?
-3. **Signals** — discretionary confirmation (user acknowledges) vs passive log-only?
-4. **FX** — context-only always, or later “hedge reminder” notes still without execution?
-5. **Primary success metric** — fewer impulsive buys, better post-mortems, or faster research? Pick one.
+See **`VERSION_2_DECISIONS.md`** for full locked text. Summary:
+
+1. **Watchlist size** → Tens; soft cap **50**; optional **archived** (not scored daily)
+2. **Commodities** → **MCX-oriented** with **roll machinery** (active trade/hedge use case)
+3. **Signals** → **Explicit Acknowledge** → optional **intended-trade** note for portfolio-relevant signals
+4. **FX** → Context + **hedge review reminders** with careful wording; **no** execution
+5. **Primary metric** → **Better post-mortems**; secondary → **fewer impulsive buys**
 
 ---
 
@@ -142,10 +144,10 @@ This order maximises reuse of v1 (regime, factors, β, EOD attribution) and avoi
 
 - Do not convert items into implementation PRs while Phases 5–8 are open
 - Do not expand scope that competes with finishing regime, ownership/sentiment, SHAP, EOD news, or polish
-- Do not treat this list as a commitment; it is a map for disciplined exploration after v1
+- Prefer changing `VERSION_2_DECISIONS.md` when product intent changes
 
 ---
 
 Last updated: 2026-08-13  
 Repo: `sanjaymaverick-cmd/portfolio`  
-Companion: `VERSION_2_TODO.md`
+Companions: `VERSION_2_TODO.md`, `VERSION_2_DECISIONS.md`
