@@ -18,11 +18,22 @@ Advisor-only desk: equities + MCX-oriented commodities, signals with Explicit Ac
 
 ## Current status
 
-- Package skeleton
-- Pure engine templates: `meridian_v2/hedge/`, `meridian_v2/vega/`
-- Unit tests for engines under `tests/v2/`
+- Package skeleton (`config`, `cli`, `app` health)
+- **Pure engines implemented:**
+  - `meridian_v2/hedge/engine.py` — inventory + vol_harvest-capable Δ reviews
+  - `meridian_v2/vega/engine.py` — vega_defense limits and sizing
+- Unit tests: `tests/v2/`
+- **Implementation details:** [`docs/v2/ENGINE_IMPLEMENTATION.md`](docs/v2/ENGINE_IMPLEMENTATION.md)
 
-UI, SQLite schema, MCX providers, and alert worker are **not** fully wired yet — see `docs/v2/GROK_BUILD_PROMPTS.md`.
+UI, SQLite schema, MCX providers, journal, and alert worker are **not** fully wired yet — see `docs/v2/GROK_BUILD_PROMPTS.md`.
+
+## Quick engine import
+
+```python
+from meridian_v2.hedge import aggregate_exposure, evaluate_symbol
+from meridian_v2.vega import aggregate_vega, evaluate_vega
+from meridian_v2.domain.enums import PolicyKind, RegimeLabel
+```
 
 ## Run tests
 
@@ -30,8 +41,15 @@ UI, SQLite schema, MCX providers, and alert worker are **not** fully wired yet �
 pytest tests/v2 -q
 ```
 
+## CLI
+
+```bash
+python -m meridian_v2 info
+```
+
 ## Docs
 
+- `docs/v2/ENGINE_IMPLEMENTATION.md` — **code-level engine details**
 - `VERSION_2_DECISIONS.md`
 - `docs/v2/HEDGE_REBALANCE_SKETCH.md`
 - `docs/v2/VEGA_HEDGE_SKETCH.md`
