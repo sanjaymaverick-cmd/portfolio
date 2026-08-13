@@ -3,7 +3,7 @@
 **Status:** Version 2 research · **not for implementation until Meridian v1 is complete**  
 **Charter:** Advisor-only. Compute drift and emit *review* suggestions. **No broker, no orders.**
 
-Related: `VERSION_2_DECISIONS.md` (MCX roll, ack, hedge wording, post-mortems), `VERSION_2_TODO.md`, `VERSION_2_EXPLORATION.md`.
+Related: `VERSION_2_DECISIONS.md` (MCX roll, ack, hedge wording, post-mortems), `VERSION_2_TODO.md`, `VERSION_2_EXPLORATION.md`, `docs/v2/VEGA_HEDGE_SKETCH.md` (vega limits / defense).
 
 ---
 
@@ -274,7 +274,6 @@ def target_hedge_lots(exposure: HedgeExposure, h_star: float) -> float:
     """
     if abs(exposure.book_lots) < 1e-12:
         return 0.0
-    # notional per lot from book
     npl = exposure.book_notional_inr / exposure.book_lots
     target_hedge_notional = -h_star * exposure.book_notional_inr
     return target_hedge_notional / npl if abs(npl) > 1e-12 else 0.0
@@ -383,7 +382,6 @@ def evaluate_symbol(
             and days_since_last_prompt < policy.min_days_between_prompts
             and not force
         ):
-            # Still allow surface if gamma_flag in Stress — implementer choice
             if not (gamma_flag and regime == RegimeLabel.STRESS):
                 suppress = suppress or "cooldown"
 
@@ -537,13 +535,35 @@ Advisor implication: even when `band_breached` is false on *current* marks, `gam
 | Long futures / inventory | ~0 Γ | Use ratio bands only |
 | Short futures hedge | ~0 Γ | Same |
 
+### Gamma hedging vs gamma scalping
+
+These share Greeks and band math but are **opposite intents**. Meridian must keep them as **separate policies / prompt tags** (`inventory_hedge` or explicit gamma-flatten vs `vol_harvest`).
+
+| Dimension | **Gamma hedging** | **Gamma scalping** |
+|-----------|-------------------|--------------------|
+| **Goal** | Move **net Γ** toward a target (often ~0) | Keep **Γ > 0** and harvest realized vol |
+| **Primary instrument** | **Options** (only they change Γ) | **Futures** (re-hedge Δ; Γ stays long) |
+| **Delta role** | Clean residual Δ with futures **after** option leg | Target Δ ≈ 0 continuously via futures bands |
+| **Typical book** | Short options risk, or flatten long convexity | Long straddle/strangle (or long options) |
+| **P&L bet** | Reduce convexity / gap pain; may pay premium | Realized vol ≳ implied, net of theta & costs |
+| **When Γ → 0** | **Success** for a flatten program | **Ends** the scalping engine |
+| **Meridian policy tag** | Risk / defense review (not “scalp”) | `vol_harvest` — Δ REVIEW |
+| **Copy tone** | “Net gamma short — review reducing short convexity?” | “Δ drifted from long Γ — review futures hedge?” |
+| **Short Γ “scalping”** | N/A | **Invalid branding** — that is paying realized vol; use **warning** only |
+| **Execution** | Ack + intended-trade only | Ack + intended-trade + **fills** for post-mortem |
+| **Automated bot** | **Out of scope** | **Out of scope** |
+
+**Rule of thumb:** If you trade **options** to change Γ, you are gamma-hedging (or opening/closing a vol book). If you trade **only futures** against a stable long-Γ options book, you are gamma-scalping mechanics.
+
+See also: `docs/v2/VEGA_HEDGE_SKETCH.md` for **implied-vol (ν)** limits — orthogonal to both rows above.
+
 ### MVP vs later
 
 | Phase | Gamma handling |
 |-------|----------------|
 | **v2 MVP (futures-first)** | `gamma = 0` on all legs; `net_gamma = 0`; no flags |
 | **v2.x options** | Feed vendor/model Δ and Γ into legs; set `SymbolPolicy.gamma_warn_abs`; show gamma sentence in `copy_review` |
-| **Not in scope** | Automated gamma scalping, continuous intraday re-hedge, or guaranteed neutral books |
+| **Not in scope** | Automated gamma scalping execution, continuous intraday re-hedge without ack, or guaranteed neutral books |
 
 ### Policy hooks (already in model)
 
@@ -558,6 +578,7 @@ Advisor implication: even when `band_breached` is false on *current* marks, `gam
 - State fact: “net gamma is short/long (value).”
 - State consequence: “delta may drift quickly if the underlier gaps.”
 - End with **review** language — never “buy/sell X to flatten gamma now” as an order.
+- Never label short-gamma re-hedging as “scalping.”
 
 ### Tests (gamma)
 
@@ -574,6 +595,7 @@ Advisor implication: even when `band_breached` is false on *current* marks, `gam
 | MCX roll | `contract_label` + `contract_notes` on legs; `days_to_roll` into `evaluate_symbol` |
 | Delta | `effective_lots = lots * delta`; futures delta = 1 |
 | Gamma | Optional; warn-only via `gamma_flag` — does not invent trades |
+| Vega | Separate module: `docs/v2/VEGA_HEDGE_SKETCH.md` |
 | UI | Show `copy_review` only if `suppress_reason is None` and `urgency != "none"` |
 | Ack | Treat each non-suppressed `HedgeReview` as portfolio-relevant signal |
 | Journal | On ack, optional intended-trade: symbol, `drift_lots_actionable`, reason, regime, `net_gamma` |
@@ -624,11 +646,12 @@ policy = HedgeRebalancePolicy(
 
 - Broker APIs, OMS, auto-send  
 - Intraday continuous rebalancing without human ack  
-- Automated gamma scalping  
+- Automated gamma scalping **execution**  
 - Full multi-asset mean-variance optimiser (optional later research)
 
 ---
 
 Drafted: 2026-08-13  
 Gamma section: 2026-08-13  
+Gamma hedging vs scalping matrix: 2026-08-13  
 Repo: `sanjaymaverick-cmd/portfolio`
