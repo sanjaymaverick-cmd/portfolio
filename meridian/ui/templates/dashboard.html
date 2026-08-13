@@ -27,13 +27,21 @@
     {% include "partials/hero.html" %}
 
     <div class="alert-rail">
-      <strong>{% if tape and tape.stale %}Tape{% else %}Alerts{% endif %}</strong>
-      {% if tape and tape.last_error %}
+      {% if open_alerts %}
+      <strong>Alerts</strong>
+      {% for item in open_alerts[:3] %}
+      <span class="sev-{{ item.severity }}">{{ item.title }}</span>
+      {% endfor %}
+      <a class="rail-more" href="/alerts">All</a>
+      {% elif tape and tape.last_error %}
+      <strong>Tape</strong>
       <span>{{ tape.last_error }}</span>
       {% elif tape and tape.stale %}
+      <strong>Tape</strong>
       <span>Marks are older than the cache TTL. Refresh the tape to mark the book.</span>
       {% else %}
-      <span>Scoring and catalyst alerts are not live. Day P&amp;L is vs prior close.</span>
+      <strong>Quiet</strong>
+      <span>No open alerts. Day P&amp;L is vs prior close.</span>
       {% endif %}
     </div>
 

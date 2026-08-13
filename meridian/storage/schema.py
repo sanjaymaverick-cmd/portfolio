@@ -142,6 +142,7 @@ class Fundamental(Base):
     profit_cagr_5y: Mapped[Decimal | None] = mapped_column(Numeric(10, 4), nullable=True)
     promoter_pct: Mapped[Decimal | None] = mapped_column(Numeric(10, 4), nullable=True)
     promoter_pledge: Mapped[Decimal | None] = mapped_column(Numeric(10, 4), nullable=True)
+    promoter_pledge_prev: Mapped[Decimal | None] = mapped_column(Numeric(10, 4), nullable=True)
     fii_pct: Mapped[Decimal | None] = mapped_column(Numeric(10, 4), nullable=True)
     dii_pct: Mapped[Decimal | None] = mapped_column(Numeric(10, 4), nullable=True)
     fii_delta: Mapped[Decimal | None] = mapped_column(Numeric(10, 4), nullable=True)
@@ -305,3 +306,30 @@ class DailyImpact(Base):
     positives: Mapped[str | None] = mapped_column(Text, nullable=True)
     negatives: Mapped[str | None] = mapped_column(Text, nullable=True)
     payload: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class AlertEvent(Base):
+    __tablename__ = "alerts"
+    __table_args__ = (UniqueConstraint("as_of", "kind", "symbol", name="uq_alert_day"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    as_of: Mapped[datetime] = mapped_column(DateTime, index=True)
+    kind: Mapped[str] = mapped_column(String(24), index=True)
+    symbol: Mapped[str] = mapped_column(String(32), index=True)
+    severity: Mapped[str] = mapped_column(String(12), default="watch")
+    title: Mapped[str] = mapped_column(String(200))
+    detail: Mapped[str | None] = mapped_column(Text, nullable=True)
+    shap_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    action: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    status: Mapped[str] = mapped_column(String(16), default="open")
+    payload: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class WatchItem(Base):
+    __tablename__ = "watchlist"
+
+    symbol: Mapped[str] = mapped_column(String(32), primary_key=True)
+    company_name: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

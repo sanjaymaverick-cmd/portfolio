@@ -21,6 +21,16 @@ class AttributionRepo:
             .order_by(Attribution.as_of.desc(), Attribution.id.desc())
         )
 
+    def previous(self, symbol: str) -> Attribution | None:
+        latest = self.latest(symbol)
+        if latest is None:
+            return None
+        return self.session.scalar(
+            select(Attribution)
+            .where(Attribution.symbol == symbol.upper(), Attribution.id < latest.id)
+            .order_by(Attribution.as_of.desc(), Attribution.id.desc())
+        )
+
     def record(
         self,
         *,

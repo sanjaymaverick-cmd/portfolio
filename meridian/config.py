@@ -101,6 +101,15 @@ class EodCfg(BaseModel):
     news_sleep_ms: int = 400
 
 
+class AlertsCfg(BaseModel):
+    weight_pct: float = 12.0
+    weight_high_pct: float = 15.0
+    pledge_step_pp: float = 2.0
+    pledge_abs: float = 20.0
+    volume_ratio: float = 0.45
+    results_lookback_days: int = 5
+
+
 class UiCfg(BaseModel):
     compact_threshold_lakhs: float = 10
     default_page_size: int = 200
@@ -116,6 +125,7 @@ class Settings(BaseSettings):
     regime: RegimeCfg = Field(default_factory=RegimeCfg)
     scoring: ScoringCfg = Field(default_factory=ScoringCfg)
     eod: EodCfg = Field(default_factory=EodCfg)
+    alerts: AlertsCfg = Field(default_factory=AlertsCfg)
     ui: UiCfg = Field(default_factory=UiCfg)
 
     @property

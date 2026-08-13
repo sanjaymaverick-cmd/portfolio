@@ -11,6 +11,7 @@ from fastapi.responses import FileResponse, Response
 from meridian.api.routes import holdings as holdings_api
 from meridian.api.routes import portfolio as portfolio_api
 from meridian.api.routes import fundamentals as fundamentals_api
+from meridian.api.routes import alerts as alerts_api
 from meridian.api.routes import eod as eod_api
 from meridian.api.routes import risk as risk_api
 from meridian.api.routes import tape as tape_api
@@ -39,6 +40,7 @@ def create_app() -> FastAPI:
     app.include_router(fundamentals_api.router, prefix="/api")
     app.include_router(risk_api.router, prefix="/api")
     app.include_router(eod_api.router, prefix="/api")
+    app.include_router(alerts_api.router, prefix="/api")
 
     @app.get("/vendor/plotly.min.js", include_in_schema=False)
     def plotly_js() -> FileResponse:

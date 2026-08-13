@@ -40,6 +40,8 @@
           <dt>EOD run</dt><dd class="num">{{ settings.eod.run_ist }} IST</dd>
           <dt>EOD move</dt><dd class="num">{{ settings.eod.move_pct }}%</dd>
           <dt>EOD LLM</dt><dd>{{ 'on' if settings.eod.llm_enabled else 'off' }}</dd>
+          <dt>Alert weight</dt><dd class="num">{{ settings.alerts.weight_pct }}%</dd>
+          <dt>Alert pledge</dt><dd class="num">{{ settings.alerts.pledge_abs }}%</dd>
         </dl>
       </div>
       <div class="panel">

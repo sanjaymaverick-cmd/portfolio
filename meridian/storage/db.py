@@ -74,6 +74,8 @@ def _migrate(engine: Engine) -> None:
         ):
             if name not in fund_cols:
                 statements.append(f"ALTER TABLE fundamentals ADD COLUMN {name} {ddl}")
+        if "promoter_pledge_prev" not in fund_cols:
+            statements.append("ALTER TABLE fundamentals ADD COLUMN promoter_pledge_prev NUMERIC(10, 4)")
     if not statements:
         return
     with engine.begin() as connection:

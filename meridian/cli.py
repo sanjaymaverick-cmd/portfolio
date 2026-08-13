@@ -41,6 +41,8 @@ def main(argv: list[str] | None = None) -> int:
     eod.add_argument("--force", action="store_true", help="Run on weekends")
     eod.add_argument("--no-fetch", action="store_true", help="Skip RSS; attribute from stored prices only")
     eod.add_argument("--as-of", dest="as_of", default=None, help="YYYY-MM-DD")
+    sub.add_parser("alerts", help="Recompute concentration, pledge, volume, results, action, regime alerts")
+    sub.add_parser("desktop", help="Open the desk in a native window (pywebview)")
     args = parser.parse_args(argv)
 
     setup_logging()
@@ -64,6 +66,10 @@ def main(argv: list[str] | None = None) -> int:
         return _score()
     if args.cmd == "eod":
         return _eod(as_of=args.as_of, force=args.force, fetch=not args.no_fetch)
+    if args.cmd == "alerts":
+        return _alerts()
+    if args.cmd == "desktop":
+        return _desktop()
     return _serve()
 
 
@@ -170,6 +176,7 @@ def _regime(*, as_of: str | None, hydrate: bool) -> int:
             print(result.error, file=sys.stderr)
             return 1
         print(f"regime {result.label} as_of={result.as_of.date() if result.as_of else '—'} {result.reason}")
+        _alerts()
         return 0
     except Exception:
         session.rollback()
@@ -189,6 +196,7 @@ def _score() -> int:
         written = engine.recompute()
         session.commit()
         print(f"scored ownership/sentiment {owned}, composites {written} (SHAP notes written)")
+        _alerts()
         return 0
     except Exception:
         session.rollback()
@@ -219,6 +227,7 @@ def _eod(*, as_of: str | None, force: bool, fetch: bool) -> int:
             f"eod as_of={result.as_of.date() if result.as_of else '—'} "
             f"selected {result.selected} news {result.news} attributed {result.attributed} ({names})"
         )
+        _alerts()
         return 0
     except Exception:
         session.rollback()
@@ -227,10 +236,32 @@ def _eod(*, as_of: str | None, force: bool, fetch: bool) -> int:
         session.close()
 
 
-def _serve() -> int:
+def _alerts() -> int:
+    from meridian.recommendations.alert_service import AlertService
+    from meridian.storage.db import get_session
+
+    session = get_session()
+    try:
+        result = AlertService(session).evaluate()
+        session.commit()
+        names = ", ".join(dict.fromkeys(result.names)) if result.names else "—"
+        print(
+            f"alerts as_of={result.as_of.date() if result.as_of else '—'} "
+            f"open {result.opened} closed {result.closed} ({names})"
+        )
+        return 0
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+def _serve(*, open_browser: bool | None = None, log_level: str = "info") -> int:
     settings = get_settings()
     url = f"http://{settings.app.host}:{settings.app.port}"
-    if settings.app.open_browser:
+    should_open = settings.app.open_browser if open_browser is None else open_browser
+    if should_open:
         threading.Thread(target=_open, args=(url,), daemon=True).start()
     uvicorn.run(
         "meridian.app:create_app",
@@ -238,8 +269,24 @@ def _serve() -> int:
         host=settings.app.host,
         port=settings.app.port,
         reload=False,
-        log_level="info",
+        log_level=log_level,
     )
+    return 0
+
+
+def _desktop() -> int:
+    settings = get_settings()
+    url = f"http://{settings.app.host}:{settings.app.port}"
+    try:
+        import webview
+    except ImportError:
+        print("pywebview missing — opening the browser desk. pip install 'meridian[desktop]'", file=sys.stderr)
+        return _serve()
+    thread = threading.Thread(target=_serve, kwargs={"open_browser": False, "log_level": "warning"}, daemon=True)
+    thread.start()
+    time.sleep(0.8)
+    webview.create_window(settings.app.name, url, width=1440, height=900, min_size=(1100, 700))
+    webview.start()
     return 0
 
 
