@@ -11,7 +11,10 @@ from sqlalchemy.orm import Session
 from meridian.config import Settings, get_settings
 from meridian.data_providers.screener import FundamentalSnap, ScreenerProvider
 from meridian.data_providers.yahoo_fundamentals import YahooFundamentals
+from meridian.scoring.composite import CompositeService
+from meridian.scoring.ownership import score_ownership
 from meridian.scoring.quality import score_quality
+from meridian.scoring.sentiment import score_sentiment
 from meridian.scoring.valuation import score_valuation
 from meridian.storage.fundamentals import FactorRepo, FundamentalRepo
 from meridian.storage.market import SettingRepo
@@ -78,6 +81,8 @@ class FundamentalService:
                 continue
             self.persist(snap)
             result.marked += 1
+        if result.marked or result.skipped:
+            CompositeService(self.session, self.settings).recompute(symbol)
         if result.failed:
             self.settings_repo.set(
                 "fundamentals.last_error", "No fundamentals: " + ", ".join(result.failed[:8])
@@ -98,13 +103,19 @@ class FundamentalService:
         self.fundamentals.upsert(snap)
         quality, q_parts = score_quality(snap)
         valuation, v_parts = score_valuation(snap)
-        self.factors.upsert(
+        ownership, o_parts = score_ownership(snap)
+        sentiment, s_parts = score_sentiment(snap)
+        self.factors.patch(
             snap.symbol,
+            source=snap.source,
             quality=quality,
             valuation=valuation,
+            ownership=ownership,
+            sentiment=sentiment,
             quality_detail=_dump(q_parts),
             valuation_detail=_dump(v_parts),
-            source=snap.source,
+            ownership_detail=_dump(o_parts),
+            sentiment_detail=_dump(s_parts),
         )
         if snap.sector:
             for holding in self.holdings.list():

@@ -22,6 +22,9 @@ python -m meridian import --file statement.csv --account "Core — Zerodha"
 python -m meridian prices --force
 python -m meridian fundamentals --force
 python -m meridian risk
+python -m meridian regime
+python -m meridian score
+python -m meridian eod
 python -m pytest
 ```
 
@@ -29,4 +32,4 @@ Data lives in `./data` (gitignored). Nothing leaves the machine unless you later
 
 ## Status
 
-Phase 4 — tape, Screener Q/V, technicals, and Nifty ρ / β.
+Phase 7 — after-close movers with same-day news and filings, lexicon pre-filter, rule (optional LLM) attribution on Command and Detail.

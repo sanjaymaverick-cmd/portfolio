@@ -27,7 +27,7 @@
       <a href="/settings" class="{{ 'active' if active == 'settings' else '' }}">Desk</a>
     </nav>
     <div class="mast-meta">
-      <span class="regime {{ regime.tone }}"><span class="dot"></span>{{ regime.label }}</span>
+      <span class="regime {{ regime.tone }}" title="{{ regime.note }}"><span class="dot"></span>{{ regime.label }}</span>
       {% if tape and tape.nifty_last is not none %}
       <span class="num">Nifty {{ '%.0f'|format(tape.nifty_last|float) }}
         <span class="{{ tape.nifty_chg|sclass }}">{{ tape.nifty_chg|pct }}</span>
@@ -72,6 +72,11 @@
           <input type="hidden" name="next_url" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
           <input type="hidden" name="force" value="1">
           <button class="btn" type="submit">Compute risk</button>
+        </form>
+        <form method="post" action="/eod/refresh">
+          <input type="hidden" name="next_url" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
+          <input type="hidden" name="force" value="1">
+          <button class="btn" type="submit">EOD movers</button>
         </form>
         <a class="btn" href="/import">Import statement</a>
         <button class="btn" type="button" data-open="manual">Add position</button>

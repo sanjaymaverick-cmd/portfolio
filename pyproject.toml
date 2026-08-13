@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "meridian"
-version = "0.4.0"
+version = "0.7.0"
 description = "Institutional-grade personal equity advisor and monitor for Indian markets."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -26,6 +26,9 @@ dependencies = [
   "python-dateutil>=2.9",
   "yfinance>=0.2.50",
   "plotly>=5.24",
+  "scikit-learn>=1.5",
+  "shap>=0.46",
+  "xgboost>=2.1",
 ]
 
 [project.optional-dependencies]

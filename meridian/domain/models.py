@@ -43,6 +43,10 @@ class HoldingView(BaseModel):
     quality: Decimal | None = None
     valuation: Decimal | None = None
     technical: Decimal | None = None
+    ownership: Decimal | None = None
+    sentiment: Decimal | None = None
+    action: str = "—"
+    confidence: Decimal | None = None
     rho: Decimal | None = None
     beta: Decimal | None = None
     beta_ols: Decimal | None = None

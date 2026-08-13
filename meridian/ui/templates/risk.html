@@ -22,7 +22,17 @@
         <dt>India VIX</dt>
         <dd class="num {{ tape.vix_chg|sclass }}">{% if tape.vix_last is not none %}{{ '%.2f'|format(tape.vix_last|float) }} · {{ tape.vix_chg|pct }}{% else %}—{% endif %}</dd>
       </dl>
-      <p class="reasoning" style="margin-top:12px">Rule-based Calm / Elevated / Stress will consume VIX, FII/DII and the Nifty trend in Phase 5.</p>
+      {% if regime_snap %}
+      <dl class="kv" style="margin-top:10px">
+        <dt>EWMA vol ann</dt>
+        <dd class="num">{% if regime_snap.ewma_vol_ann is not none %}{{ '%.1f'|format(regime_snap.ewma_vol_ann|float * 100) }}%{% else %}—{% endif %}</dd>
+        <dt>Kalman trend z</dt>
+        <dd class="num">{% if regime_snap.kalman_trend_z is not none %}{{ '%+.2f'|format(regime_snap.kalman_trend_z|float) }}{% else %}—{% endif %}</dd>
+      </dl>
+      <p class="muted" style="margin:10px 0 0;font-size:11px">{{ regime.note }}</p>
+      {% else %}
+      <p class="reasoning" style="margin-top:12px">Run <span class="num">python -m meridian regime</span> after the tape is marked.</p>
+      {% endif %}
     </div>
     <div class="panel">
       <h3>Portfolio β</h3>

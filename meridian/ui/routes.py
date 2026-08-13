@@ -23,8 +23,13 @@ from meridian.storage.fundamentals import FactorRepo, FundamentalRepo
 from meridian.storage.repositories import AccountRepo, HoldingRepo, ImportRepo
 from meridian.storage.seed import seed_demo
 from meridian.risk.service import BOOK, RiskService
+from meridian.scoring.regime_service import RegimeInputService
+from meridian.storage.regime import RegimeRepo
 from meridian.storage.risk import RiskRepo
-from meridian.ui.charts import price_chart_html, risk_chart_html, sparkline
+from meridian.storage.attributions import AttributionRepo
+from meridian.storage.eod import EodRepo, decode_list
+from meridian.recommendations.eod_service import EodService
+from meridian.ui.charts import price_chart_html, risk_chart_html, shap_bar_html, sparkline
 from meridian.ui.formatters import FILTERS
 
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
@@ -54,7 +59,8 @@ def _ctx(request: Request, session: Session, **extra: Any) -> dict[str, Any]:
         "tape": tape,
         "book_risk": RiskRepo(session).get(BOOK),
         "market": settings.market,
-        "regime": {"label": "Unscored", "tone": "idle", "note": "Regime engine arrives in Phase 5."},
+        "regime": RegimeInputService(session).latest_view(),
+        "regime_snap": RegimeRepo(session).latest(),
         **extra,
     }
 
@@ -70,6 +76,12 @@ def _with_sparks(session, views):  # noqa: ANN001
             view.quality = row.quality
             view.valuation = row.valuation
             view.technical = row.technical
+            view.ownership = row.ownership
+            view.sentiment = row.sentiment
+            view.score = row.composite
+            view.action = row.action or "—"
+            view.recommendation = row.action or "—"
+            view.confidence = row.confidence
     risks = RiskRepo(session).map_for([view.symbol for view in views])
     for view in views:
         risk = risks.get(view.symbol)
@@ -100,6 +112,7 @@ def command(request: Request, session: Session = Depends(db_session)) -> HTMLRes
             key=lambda item: abs(item.pnl_pct or 0),
             reverse=True,
         )[:5]
+    eod_cards, eod_as_of = _eod_cards(session, views)
     return templates.TemplateResponse(
         request,
         "dashboard.html",
@@ -110,6 +123,8 @@ def command(request: Request, session: Session = Depends(db_session)) -> HTMLRes
             holdings=views,
             book=book,
             movers=movers,
+            eod_cards=eod_cards,
+            eod_as_of=eod_as_of,
             jobs=ImportRepo(session).recent(5),
         ),
     )
@@ -162,12 +177,20 @@ def holding_detail(
         view.quality = factor.quality
         view.valuation = factor.valuation
         view.technical = factor.technical
+        view.ownership = factor.ownership
+        view.sentiment = factor.sentiment
+        view.score = factor.composite
+        view.action = factor.action or "—"
+        view.recommendation = factor.action or "—"
+        view.confidence = factor.confidence
     fundamental = FundamentalRepo(session).get(view.symbol)
     risk = RiskRepo(session).get(view.symbol)
     if risk:
         view.rho = risk.rho
         view.beta = risk.beta_shrunk or risk.beta_ewma
     risk_chart = risk_chart_html(view.symbol, RiskRepo(session).points(view.symbol))
+    attribution = AttributionRepo(session).latest(view.symbol)
+    shap_phis = _parts(attribution.phis if attribution else None)
     return templates.TemplateResponse(
         request,
         "detail.html",
@@ -184,9 +207,16 @@ def holding_detail(
             quality_parts=_parts(factor.quality_detail if factor else None),
             valuation_parts=_parts(factor.valuation_detail if factor else None),
             technical_parts=_parts(factor.technical_detail if factor else None),
+            ownership_parts=_parts(factor.ownership_detail if factor else None),
+            sentiment_parts=_parts(factor.sentiment_detail if factor else None),
+            rec_note=(attribution.reasoning if attribution else _rec_note(factor)),
+            portfolio_note=(attribution.portfolio_note if attribution else ""),
+            shap_chart=shap_bar_html(view.symbol, {k: float(v) for k, v in shap_phis.items() if v is not None}),
+            shap_engine=(attribution.engine if attribution else None),
             risk=risk,
             risk_chart=risk_chart,
             bar_count=len(bars),
+            eod_timeline=_eod_timeline(session, view.symbol),
         ),
     )
 
@@ -225,6 +255,60 @@ def _parts(raw: str | None) -> dict[str, float | None]:
         return json.loads(raw)
     except json.JSONDecodeError:
         return {}
+
+
+def _rec_note(factor) -> str:  # noqa: ANN001
+    if factor is None or not factor.action:
+        return ""
+    from meridian.scoring.composite import brief_reason
+
+    return brief_reason(factor, factor.action, None)
+
+
+def _eod_cards(session: Session, views) -> tuple[list[dict[str, Any]], datetime | None]:  # noqa: ANN001
+    repo = EodRepo(session)
+    day = repo.latest_day()
+    rows = repo.movers(day)
+    ids = {view.symbol: view.id for view in views}
+    cards: list[dict[str, Any]] = []
+    for perf, impact in rows:
+        cards.append(
+            {
+                "symbol": perf.symbol,
+                "company": perf.company_name,
+                "holding_id": ids.get(perf.symbol),
+                "day_pct": perf.day_pnl_pct,
+                "day_pnl": perf.day_pnl,
+                "contribution": perf.contribution,
+                "why": perf.why,
+                "engine": impact.engine if impact else None,
+                "takeaway": impact.takeaway if impact else None,
+                "confidence": impact.confidence if impact else None,
+                "positives": decode_list(impact.positives) if impact else [],
+                "negatives": decode_list(impact.negatives) if impact else [],
+                "market": impact.market_context if impact else None,
+            }
+        )
+    return cards, day
+
+
+def _eod_timeline(session: Session, symbol: str) -> list[dict[str, Any]]:
+    repo = EodRepo(session)
+    out: list[dict[str, Any]] = []
+    for impact in repo.timeline(symbol):
+        out.append(
+            {
+                "as_of": impact.as_of,
+                "engine": impact.engine,
+                "takeaway": impact.takeaway,
+                "market": impact.market_context,
+                "confidence": impact.confidence,
+                "positives": decode_list(impact.positives),
+                "negatives": decode_list(impact.negatives),
+                "news": repo.news_for(impact.as_of, symbol),
+            }
+        )
+    return out
 
 
 @router.get("/import", response_class=HTMLResponse)
@@ -374,6 +458,18 @@ def refresh_risk(
 ) -> RedirectResponse:
     RiskService(session).compute(force=bool(force))
     target = next_url if next_url.startswith("/") else "/risk"
+    return RedirectResponse(target, status_code=303)
+
+
+@router.post("/eod/refresh")
+def refresh_eod(
+    request: Request,
+    session: Session = Depends(db_session),
+    next_url: str = Form("/"),
+    force: str = Form(""),
+) -> RedirectResponse:
+    EodService(session).run(force=bool(force), fetch=True)
+    target = next_url if next_url.startswith("/") else "/"
     return RedirectResponse(target, status_code=303)
 
 

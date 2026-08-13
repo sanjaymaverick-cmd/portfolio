@@ -55,15 +55,50 @@ class ProvidersCfg(BaseModel):
     batch_size: int = 8
 
 
+class KalmanCfg(BaseModel):
+    q_level: float = 1.0e-5
+    q_trend: float = 1.0e-7
+    r: float = 1.0e-4
+
+
 class RegimeCfg(BaseModel):
     mode: str = "rules"
     vix_elevated: float = 16.0
     vix_stress: float = 22.0
+    vix_calm_max: float = 13.5
+    vix_elevated_max: float = 19.5
+    vix_stress_exit: float = 18.0
+    vix_elevated_exit_to_calm: float = 12.5
+    confirmation_days: int = 2
+    min_hold_days: int = 1
+    ewma_vol_stress: float = 0.22
+    ewma_vol_elevated: float = 0.14
+    trend_z_risk_off: float = -0.75
+    trend_z_risk_on: float = 0.75
+    sma_window: int = 50
+    trend_z_window: int = 60
+    history_days: int = 400
+    kalman: KalmanCfg = Field(default_factory=KalmanCfg)
 
 
 class ScoringCfg(BaseModel):
     scale_min: int = 0
     scale_max: int = 10
+    weights: dict[str, dict[str, float]] = Field(default_factory=dict)
+    actions: dict[str, dict[str, float]] = Field(default_factory=dict)
+
+
+class EodCfg(BaseModel):
+    run_ist: str = "16:15"
+    move_pct: float = 1.5
+    top_n: int = 5
+    max_names: int = 8
+    keep_headlines: int = 6
+    skip_weekends: bool = True
+    llm_enabled: bool = False
+    llm_url: str = ""
+    llm_model: str = ""
+    news_sleep_ms: int = 400
 
 
 class UiCfg(BaseModel):
@@ -80,6 +115,7 @@ class Settings(BaseSettings):
     providers: ProvidersCfg = Field(default_factory=ProvidersCfg)
     regime: RegimeCfg = Field(default_factory=RegimeCfg)
     scoring: ScoringCfg = Field(default_factory=ScoringCfg)
+    eod: EodCfg = Field(default_factory=EodCfg)
     ui: UiCfg = Field(default_factory=UiCfg)
 
     @property

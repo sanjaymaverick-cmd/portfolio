@@ -16,6 +16,15 @@ def signed_class(value: Decimal | float | int | None) -> str:
     return "num"
 
 
+def badge_kind(action: str | None) -> str:
+    text = (action or "").lower()
+    if "buy" in text:
+        return "buy"
+    if text in {"sell", "reduce"}:
+        return "sell"
+    return "hold"
+
+
 def weight_bar(pct: Decimal | float | None) -> str:
     if pct is None:
         return "0"
@@ -30,4 +39,5 @@ FILTERS = {
     "qty": format_qty,
     "sclass": signed_class,
     "wbar": weight_bar,
+    "badge": badge_kind,
 }

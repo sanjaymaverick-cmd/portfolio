@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime
 
 from sqlalchemy import select
@@ -15,6 +16,9 @@ class FundamentalRepo:
 
     def get(self, symbol: str) -> Fundamental | None:
         return self.session.get(Fundamental, symbol.upper())
+
+    def list(self) -> list[Fundamental]:
+        return list(self.session.scalars(select(Fundamental).order_by(Fundamental.symbol)))
 
     def upsert(self, snap: FundamentalSnap) -> Fundamental:
         row = self.get(snap.symbol)
@@ -43,6 +47,13 @@ class FundamentalRepo:
             "sales_cagr_5y": snap.sales_cagr_5y,
             "profit_cagr_3y": snap.profit_cagr_3y,
             "profit_cagr_5y": snap.profit_cagr_5y,
+            "promoter_pct": snap.promoter_pct,
+            "promoter_pledge": snap.promoter_pledge,
+            "fii_pct": snap.fii_pct,
+            "dii_pct": snap.dii_pct,
+            "fii_delta": snap.fii_delta,
+            "dii_delta": snap.dii_delta,
+            "analysis_notes": json.dumps({"pros": snap.pros, "cons": snap.cons}),
             "fetched_at": datetime.now(),
             "as_of": snap.as_of,
             "notes": snap.notes,
@@ -85,7 +96,24 @@ class FundamentalRepo:
             profit_cagr_5y=row.profit_cagr_5y,
             as_of=row.as_of,
             notes=row.notes,
+            promoter_pct=row.promoter_pct,
+            promoter_pledge=row.promoter_pledge,
+            fii_pct=row.fii_pct,
+            dii_pct=row.dii_pct,
+            fii_delta=row.fii_delta,
+            dii_delta=row.dii_delta,
+            **_notes_lists(row.analysis_notes),
         )
+
+
+def _notes_lists(raw: str | None) -> dict[str, list[str]]:
+    if not raw:
+        return {"pros": [], "cons": []}
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError:
+        return {"pros": [], "cons": []}
+    return {"pros": list(payload.get("pros") or []), "cons": list(payload.get("cons") or [])}
 
 
 class FactorRepo:
@@ -130,6 +158,21 @@ class FactorRepo:
         self.session.flush()
         return row
 
+    def patch(self, symbol: str, *, source: str | None = None, **fields: object) -> FactorScore:
+        row = self.get(symbol)
+        now = datetime.now()
+        if row is None:
+            row = FactorScore(symbol=symbol.upper(), scored_at=now)
+            self.session.add(row)
+        for key, value in fields.items():
+            if hasattr(row, key):
+                setattr(row, key, value)
+        row.scored_at = now
+        if source:
+            row.source = source
+        self.session.flush()
+        return row
+
     def upsert(
         self,
         symbol: str,
@@ -140,25 +183,11 @@ class FactorRepo:
         valuation_detail: str | None,
         source: str,
     ) -> FactorScore:
-        row = self.get(symbol)
-        now = datetime.now()
-        if row:
-            row.quality = quality
-            row.valuation = valuation
-            row.quality_detail = quality_detail
-            row.valuation_detail = valuation_detail
-            row.scored_at = now
-            row.source = source
-        else:
-            row = FactorScore(
-                symbol=symbol.upper(),
-                quality=quality,
-                valuation=valuation,
-                quality_detail=quality_detail,
-                valuation_detail=valuation_detail,
-                scored_at=now,
-                source=source,
-            )
-            self.session.add(row)
-        self.session.flush()
-        return row
+        return self.patch(
+            symbol,
+            source=source,
+            quality=quality,
+            valuation=valuation,
+            quality_detail=quality_detail,
+            valuation_detail=valuation_detail,
+        )

@@ -33,6 +33,14 @@ def main(argv: list[str] | None = None) -> int:
     risk = sub.add_parser("risk", help="Compute technicals, ρ and β vs Nifty from the cached tape")
     risk.add_argument("--force", action="store_true")
     risk.add_argument("--symbol", default=None)
+    regime = sub.add_parser("regime", help="Update Nifty/VIX sensors and the hysteresis regime label")
+    regime.add_argument("--as-of", dest="as_of", default=None, help="YYYY-MM-DD")
+    regime.add_argument("--no-hydrate", action="store_true")
+    sub.add_parser("score", help="Recompute ownership, sentiment, composite and actions")
+    eod = sub.add_parser("eod", help="After-close movers, same-day news, and attribution")
+    eod.add_argument("--force", action="store_true", help="Run on weekends")
+    eod.add_argument("--no-fetch", action="store_true", help="Skip RSS; attribute from stored prices only")
+    eod.add_argument("--as-of", dest="as_of", default=None, help="YYYY-MM-DD")
     args = parser.parse_args(argv)
 
     setup_logging()
@@ -50,6 +58,12 @@ def main(argv: list[str] | None = None) -> int:
         return _fundamentals(force=args.force, symbol=args.symbol)
     if args.cmd == "risk":
         return _risk(force=args.force, symbol=args.symbol)
+    if args.cmd == "regime":
+        return _regime(as_of=args.as_of, hydrate=not args.no_hydrate)
+    if args.cmd == "score":
+        return _score()
+    if args.cmd == "eod":
+        return _eod(as_of=args.as_of, force=args.force, fetch=not args.no_fetch)
     return _serve()
 
 
@@ -88,6 +102,7 @@ def _prices(*, force: bool) -> int:
             return 1
         failed = f", failed {', '.join(result.failed)}" if result.failed else ""
         print(f"marked {result.marked}, skipped {result.skipped}{failed}")
+        _regime(as_of=None, hydrate=False)
         return 0
     except Exception:
         session.rollback()
@@ -130,6 +145,80 @@ def _risk(*, force: bool, symbol: str | None) -> int:
             return 1
         failed = f", failed {', '.join(result.failed)}" if result.failed else ""
         print(f"risk marked {result.marked}, skipped {result.skipped}{failed} nifty={result.nifty}")
+        return 0
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+def _regime(*, as_of: str | None, hydrate: bool) -> int:
+    from datetime import datetime
+
+    from meridian.scoring.regime_service import RegimeInputService
+    from meridian.storage.db import get_session
+
+    when = None
+    if as_of:
+        when = datetime.fromisoformat(as_of)
+    session = get_session()
+    try:
+        result = RegimeInputService(session).run(when, hydrate=hydrate)
+        session.commit()
+        if result.error:
+            print(result.error, file=sys.stderr)
+            return 1
+        print(f"regime {result.label} as_of={result.as_of.date() if result.as_of else '—'} {result.reason}")
+        return 0
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+def _score() -> int:
+    from meridian.scoring.composite import CompositeService
+    from meridian.storage.db import get_session
+
+    session = get_session()
+    try:
+        engine = CompositeService(session)
+        owned = engine.rescore_ownership_sentiment()
+        written = engine.recompute()
+        session.commit()
+        print(f"scored ownership/sentiment {owned}, composites {written} (SHAP notes written)")
+        return 0
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+def _eod(*, as_of: str | None, force: bool, fetch: bool) -> int:
+    from datetime import datetime
+
+    from meridian.recommendations.eod_service import EodService
+    from meridian.storage.db import get_session
+
+    when = datetime.fromisoformat(as_of) if as_of else None
+    session = get_session()
+    try:
+        result = EodService(session).run(when, force=force, fetch=fetch)
+        session.commit()
+        if result.error:
+            print(result.error, file=sys.stderr)
+            return 1
+        if result.skipped:
+            print(f"eod skipped {result.skipped} as_of={result.as_of.date() if result.as_of else '—'}")
+            return 0
+        names = ", ".join(result.names) if result.names else "—"
+        print(
+            f"eod as_of={result.as_of.date() if result.as_of else '—'} "
+            f"selected {result.selected} news {result.news} attributed {result.attributed} ({names})"
+        )
         return 0
     except Exception:
         session.rollback()

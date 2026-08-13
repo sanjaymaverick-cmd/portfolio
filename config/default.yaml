@@ -40,10 +40,74 @@ regime:
   mode: rules          # rules | soft | hmm
   vix_elevated: 16.0
   vix_stress: 22.0
+  vix_calm_max: 13.5
+  vix_elevated_max: 19.5
+  vix_stress_exit: 18.0
+  vix_elevated_exit_to_calm: 12.5
+  confirmation_days: 2
+  min_hold_days: 1
+  ewma_vol_stress: 0.22
+  ewma_vol_elevated: 0.14
+  trend_z_risk_off: -0.75
+  trend_z_risk_on: 0.75
+  sma_window: 50
+  trend_z_window: 60
+  history_days: 400
+  kalman:
+    q_level: 1.0e-5
+    q_trend: 1.0e-7
+    r: 1.0e-4
 
 scoring:
   scale_min: 0
   scale_max: 10
+  weights:
+    Calm:
+      quality: 0.28
+      valuation: 0.22
+      technical: 0.18
+      ownership: 0.18
+      sentiment: 0.14
+    Elevated:
+      quality: 0.26
+      valuation: 0.16
+      technical: 0.22
+      ownership: 0.22
+      sentiment: 0.14
+    Stress:
+      quality: 0.24
+      valuation: 0.10
+      technical: 0.26
+      ownership: 0.26
+      sentiment: 0.14
+  actions:
+    Calm:
+      strong_buy: 8.0
+      buy: 6.8
+      hold: 5.0
+      reduce: 3.8
+    Elevated:
+      strong_buy: 8.3
+      buy: 7.1
+      hold: 5.2
+      reduce: 4.0
+    Stress:
+      strong_buy: 8.6
+      buy: 7.4
+      hold: 5.5
+      reduce: 4.2
+
+eod:
+  run_ist: "16:15"
+  move_pct: 1.5
+  top_n: 5
+  max_names: 8
+  keep_headlines: 6
+  skip_weekends: true
+  llm_enabled: false
+  llm_url: ""
+  llm_model: ""
+  news_sleep_ms: 400
 
 ui:
   compact_threshold_lakhs: 10

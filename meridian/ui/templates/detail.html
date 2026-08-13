@@ -7,10 +7,9 @@
       <p class="mist">{{ holding.company_name }} · {{ holding.exchange }} · {{ holding.sector }} · {{ holding.mcap }} · {{ holding.yahoo }}</p>
     </div>
     <div style="text-align:right">
-      {% if holding.quality is not none or holding.valuation is not none or holding.technical is not none %}
-      <span class="badge hold">Q {{ '%.1f'|format(holding.quality|float) if holding.quality is not none else '—' }} · V {{ '%.1f'|format(holding.valuation|float) if holding.valuation is not none else '—' }} · T {{ '%.1f'|format(holding.technical|float) if holding.technical is not none else '—' }}</span>
-      {% else %}
-      <span class="badge hold">Unscored</span>
+      <span class="badge {{ holding.recommendation|badge }}">{{ holding.recommendation }}</span>
+      {% if holding.score is not none %}
+      <p class="muted" style="margin:8px 0 0">Composite {{ '%.1f'|format(holding.score|float) }}{% if holding.confidence is not none %} · conf {{ '%.0f'|format(holding.confidence|float * 100) }}%{% endif %}</p>
       {% endif %}
       <p class="muted" style="margin:8px 0 0">Weight {{ weight|pct if weight is not none else '—' }} of book</p>
     </div>
@@ -44,7 +43,16 @@
       </div>
       <div class="panel">
         <h3>Ownership</h3>
-        <div class="placeholder">Promoter · FII · DII · Phase 3</div>
+        {% if fundamental and fundamental.promoter_pct is not none %}
+        <dl class="kv">
+          <dt>Promoter</dt><dd class="num">{{ '%.2f'|format(fundamental.promoter_pct|float) }}%</dd>
+          <dt>Pledge</dt><dd class="num">{% if fundamental.promoter_pledge is not none %}{{ '%.2f'|format(fundamental.promoter_pledge|float) }}%{% else %}—{% endif %}</dd>
+          <dt>FII</dt><dd class="num">{{ '%.2f'|format(fundamental.fii_pct|float) if fundamental.fii_pct is not none else '—' }}{% if fundamental.fii_delta is not none %} · {{ '%+.2f'|format(fundamental.fii_delta|float) }} pp{% endif %}</dd>
+          <dt>DII</dt><dd class="num">{{ '%.2f'|format(fundamental.dii_pct|float) if fundamental.dii_pct is not none else '—' }}{% if fundamental.dii_delta is not none %} · {{ '%+.2f'|format(fundamental.dii_delta|float) }} pp{% endif %}</dd>
+        </dl>
+        {% else %}
+        <div class="placeholder">Refresh fundamentals to pull shareholding</div>
+        {% endif %}
       </div>
     </div>
     <div>
@@ -54,6 +62,8 @@
           {% set qpct = (holding.quality * 10) if holding.quality is not none else 0 %}
           {% set vpct = (holding.valuation * 10) if holding.valuation is not none else 0 %}
           {% set tpct = (holding.technical * 10) if holding.technical is not none else 0 %}
+          {% set opct = (holding.ownership * 10) if holding.ownership is not none else 0 %}
+          {% set sentpct = (holding.sentiment * 10) if holding.sentiment is not none else 0 %}
           <div>
             <span>Quality</span>
             <div class="track"><span style="width: {{ qpct }}%"></span></div>
@@ -69,13 +79,16 @@
             <div class="track"><span style="width: {{ tpct }}%"></span></div>
             <span class="num">{{ '%.1f'|format(holding.technical|float) if holding.technical is not none else '—' }}</span>
           </div>
-          {% for name in ['Ownership','Sentiment'] %}
           <div>
-            <span>{{ name }}</span>
-            <div class="track"><span style="width:0%"></span></div>
-            <span class="num muted">—</span>
+            <span>Ownership</span>
+            <div class="track"><span style="width: {{ opct }}%"></span></div>
+            <span class="num">{{ '%.1f'|format(holding.ownership|float) if holding.ownership is not none else '—' }}</span>
           </div>
-          {% endfor %}
+          <div>
+            <span>Sentiment</span>
+            <div class="track"><span style="width: {{ sentpct }}%"></span></div>
+            <span class="num">{{ '%.1f'|format(holding.sentiment|float) if holding.sentiment is not none else '—' }}</span>
+          </div>
         </div>
         {% if quality_parts %}
         <p class="muted" style="margin:10px 0 0;font-size:11px">
@@ -97,6 +110,14 @@
         <p class="muted" style="margin:6px 0 0;font-size:11px">
           Momentum drivers:
           {% for k, v in technical_parts.items() %}
+            {{ k }} {{ '%.1f'|format(v) if v is not none else '—' }}{% if not loop.last %} · {% endif %}
+          {% endfor %}
+        </p>
+        {% endif %}
+        {% if ownership_parts %}
+        <p class="muted" style="margin:6px 0 0;font-size:11px">
+          Ownership drivers:
+          {% for k, v in ownership_parts.items() %}
             {{ k }} {{ '%.1f'|format(v) if v is not none else '—' }}{% if not loop.last %} · {% endif %}
           {% endfor %}
         </p>
@@ -136,17 +157,53 @@
         {% endif %}
       </div>
       <div class="panel" style="margin-bottom:12px">
+        <h3>Session drivers</h3>
+        {% if eod_timeline %}
+        <div class="timeline">
+          {% for item in eod_timeline %}
+          <article class="timeline-item">
+            <div class="when">{{ item.as_of.strftime('%d %b %Y') }} · {{ item.engine }}{% if item.confidence is not none %} · {{ '%.0f'|format(item.confidence|float * 100) }}%{% endif %}</div>
+            <p class="reasoning">{{ item.takeaway }}</p>
+            {% if item.positives or item.negatives %}
+            <ul class="driver-list">
+              {% for row in item.positives[:3] %}
+              <li class="up">{{ row.driver }}</li>
+              {% endfor %}
+              {% for row in item.negatives[:3] %}
+              <li class="down">{{ row.driver }}</li>
+              {% endfor %}
+            </ul>
+            {% endif %}
+            {% if item.news %}
+            <ul class="news-list">
+              {% for n in item.news[:6] %}
+              <li>
+                {% if n.url %}<a href="{{ n.url }}" target="_blank" rel="noopener">{{ n.title }}</a>{% else %}{{ n.title }}{% endif %}
+                <span class="muted"> · {{ n.source }}{% if n.is_filing %} · filing{% endif %}{% if n.aspect and n.aspect != 'Other' %} · {{ n.aspect }}{% endif %}</span>
+              </li>
+              {% endfor %}
+            </ul>
+            {% endif %}
+            {% if item.market %}<p class="muted" style="margin:6px 0 0;font-size:11px">{{ item.market }}</p>{% endif %}
+          </article>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="reasoning">No daily attribution stored for this name. Run <span class="num">python -m meridian eod</span> after the close.</p>
+        {% endif %}
+      </div>
+      <div class="panel" style="margin-bottom:12px">
         <h3>Recommendation</h3>
         <p class="reasoning">
-          {{ holding.symbol }} is on the book at {{ holding.quantity|qty }} shares,
-          average {{ holding.avg_cost|inr }} against last mark {{ holding.last_price|inr }}.
-          Unrealised P&amp;L is <span class="{{ holding.pnl|sclass }}">{{ holding.pnl|inr_s }}
-          ({{ holding.pnl_pct|pct }})</span>.
-          Session P&amp;L vs prior close is
-          <span class="{{ holding.day_pnl|sclass }}">{{ holding.day_pnl|inr_s }} ({{ holding.day_pnl_pct|pct }})</span>.
-          Quality, Valuation, and Momentum are marked. Ownership, regime, and SHAP arrive later.
-          Until then this page is a marked lot with three factors — not advice.
+          {{ rec_note or 'Run python -m meridian score to write the SHAP note.' }}
         </p>
+        {% if portfolio_note %}
+        <p class="muted" style="margin:10px 0 0;font-size:12px">{{ portfolio_note }}</p>
+        {% endif %}
+        {% if shap_chart %}
+        <h3 style="margin-top:14px">SHAP drivers{% if shap_engine %} · {{ shap_engine }}{% endif %}</h3>
+        <div class="chart-frame">{{ shap_chart|safe }}</div>
+        {% endif %}
       </div>
       <div class="panel" style="margin-bottom:12px">
         <h3>Lot</h3>

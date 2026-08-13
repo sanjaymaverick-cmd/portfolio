@@ -51,6 +51,14 @@ class FundamentalSnap:
     profit_cagr_5y: Decimal | None = None
     as_of: datetime | None = None
     notes: str | None = None
+    promoter_pct: Decimal | None = None
+    promoter_pledge: Decimal | None = None
+    fii_pct: Decimal | None = None
+    dii_pct: Decimal | None = None
+    fii_delta: Decimal | None = None
+    dii_delta: Decimal | None = None
+    pros: list[str] = field(default_factory=list)
+    cons: list[str] = field(default_factory=list)
     extras: dict[str, Any] = field(default_factory=dict)
 
 
@@ -193,8 +201,60 @@ def parse_company_html(html: str, *, symbol: str, url: str | None = None) -> Fun
         profit_cagr_3y=_num(growth.get("compounded profit growth", {}).get("3 years")),
         profit_cagr_5y=_num(growth.get("compounded profit growth", {}).get("5 years")),
         as_of=datetime.now(),
+        **_ownership_fields(html),
     )
     return snap
+
+
+def _ownership_fields(html: str) -> dict[str, Any]:
+    table = _section_table(html, "shareholding")
+    promoter = _series_tail(table, "promoter")
+    fii = _series_tail(table, "fii")
+    dii = _series_tail(table, "dii")
+    pledge = _series_tail(table, "pledg")
+    return {
+        "promoter_pct": promoter[-1] if promoter else None,
+        "promoter_pledge": pledge[-1] if pledge else None,
+        "fii_pct": fii[-1] if fii else None,
+        "dii_pct": dii[-1] if dii else None,
+        "fii_delta": (fii[-1] - fii[-2]) if len(fii) >= 2 else None,
+        "dii_delta": (dii[-1] - dii[-2]) if len(dii) >= 2 else None,
+        "pros": _bullet_list(html, "pros"),
+        "cons": _bullet_list(html, "cons"),
+    }
+
+
+def _series_tail(table: list[list[str]], needle: str) -> list[Decimal]:
+    if not table:
+        return []
+    header = table[0]
+    values: list[Decimal] = []
+    for row in table[1:]:
+        if not row:
+            continue
+        label = _norm(row[0])
+        if needle not in label:
+            continue
+        for head, cell in zip(header[1:], row[1:], strict=False):
+            number = _num(cell)
+            if number is not None:
+                values.append(number)
+        break
+    return values
+
+
+def _bullet_list(html: str, css_class: str) -> list[str]:
+    block = re.search(rf'class="{css_class}"[^>]*>(.*?)</div>', html, flags=re.S | re.I)
+    if not block:
+        return []
+    items = re.findall(r"<li[^>]*>(.*?)</li>", block.group(1), flags=re.S | re.I)
+    out: list[str] = []
+    for item in items:
+        text = re.sub(r"<[^>]+>", "", item)
+        text = re.sub(r"\s+", " ", _unescape(text)).strip()
+        if text:
+            out.append(text)
+    return out
 
 
 def _top_ratios(html: str) -> dict[str, str]:

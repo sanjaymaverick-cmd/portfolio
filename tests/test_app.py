@@ -16,3 +16,6 @@ def test_desk_pages_render() -> None:
     missing = client.get("/api/fundamentals/NOSUCH")
     assert missing.status_code == 200
     assert missing.json()["status"] == "missing"
+    eod = client.get("/api/eod/movers")
+    assert eod.status_code == 200
+    assert "movers" in eod.json()

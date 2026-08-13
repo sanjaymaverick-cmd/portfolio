@@ -125,6 +125,52 @@ def price_chart_html(symbol: str, bars: list[PriceBar]) -> str:
     )
 
 
+def shap_bar_html(symbol: str, phis: dict[str, float]) -> str:
+    items = [(name, value) for name, value in phis.items() if abs(value) >= 0.01]
+    if not items:
+        return ""
+    items.sort(key=lambda item: item[1])
+    try:
+        import plotly.graph_objects as go
+    except ImportError:
+        return _shap_fallback(items)
+    colors = [UP if value >= 0 else DOWN for _, value in items]
+    figure = go.Figure(
+        go.Bar(
+            x=[value for _, value in items],
+            y=[name for name, _ in items],
+            orientation="h",
+            marker_color=colors,
+            hovertemplate="%{y}: %{x:+.2f}<extra></extra>",
+        )
+    )
+    figure.update_layout(
+        paper_bgcolor=INK,
+        plot_bgcolor=INK,
+        font=dict(family="IBM Plex Sans, Segoe UI, sans-serif", color=MIST, size=11),
+        margin=dict(l=88, r=16, t=8, b=24),
+        height=200,
+        showlegend=False,
+    )
+    figure.update_xaxes(gridcolor=LINE, zeroline=True, zerolinecolor=ASH, tickfont=dict(size=10))
+    figure.update_yaxes(tickfont=dict(size=11, color=IVORY))
+    return figure.to_html(
+        full_html=False,
+        include_plotlyjs=False,
+        config={"displaylogo": False, "modeBarButtonsToRemove": ["lasso2d", "select2d"]},
+        div_id=f"shap-{symbol.lower()}",
+    )
+
+
+def _shap_fallback(items: list[tuple[str, float]]) -> str:
+    rows = "".join(
+        f'<div class="alloc-row"><span>{name}</span>'
+        f'<span class="num {"up" if value >= 0 else "down"}">{value:+.2f}</span></div>'
+        for name, value in items
+    )
+    return f'<div class="alloc">{rows}</div>'
+
+
 def _sma(values: list[float], window: int) -> list[float | None]:
     out: list[float | None] = [None] * len(values)
     total = 0.0

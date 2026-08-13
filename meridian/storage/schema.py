@@ -140,6 +140,13 @@ class Fundamental(Base):
     sales_cagr_5y: Mapped[Decimal | None] = mapped_column(Numeric(10, 4), nullable=True)
     profit_cagr_3y: Mapped[Decimal | None] = mapped_column(Numeric(10, 4), nullable=True)
     profit_cagr_5y: Mapped[Decimal | None] = mapped_column(Numeric(10, 4), nullable=True)
+    promoter_pct: Mapped[Decimal | None] = mapped_column(Numeric(10, 4), nullable=True)
+    promoter_pledge: Mapped[Decimal | None] = mapped_column(Numeric(10, 4), nullable=True)
+    fii_pct: Mapped[Decimal | None] = mapped_column(Numeric(10, 4), nullable=True)
+    dii_pct: Mapped[Decimal | None] = mapped_column(Numeric(10, 4), nullable=True)
+    fii_delta: Mapped[Decimal | None] = mapped_column(Numeric(10, 4), nullable=True)
+    dii_delta: Mapped[Decimal | None] = mapped_column(Numeric(10, 4), nullable=True)
+    analysis_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     fetched_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     as_of: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -158,8 +165,28 @@ class FactorScore(Base):
     quality_detail: Mapped[str | None] = mapped_column(Text, nullable=True)
     valuation_detail: Mapped[str | None] = mapped_column(Text, nullable=True)
     technical_detail: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ownership_detail: Mapped[str | None] = mapped_column(Text, nullable=True)
+    sentiment_detail: Mapped[str | None] = mapped_column(Text, nullable=True)
+    action: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    confidence: Mapped[Decimal | None] = mapped_column(Numeric(6, 2), nullable=True)
     scored_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     source: Mapped[str] = mapped_column(String(24), default="screener")
+
+
+class Attribution(Base):
+    __tablename__ = "attributions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    symbol: Mapped[str] = mapped_column(String(32), index=True)
+    as_of: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    regime: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    action: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    composite: Mapped[Decimal | None] = mapped_column(Numeric(6, 2), nullable=True)
+    base_value: Mapped[Decimal | None] = mapped_column(Numeric(8, 4), nullable=True)
+    engine: Mapped[str] = mapped_column(String(24), default="linear")
+    phis: Mapped[str | None] = mapped_column(Text, nullable=True)
+    reasoning: Mapped[str | None] = mapped_column(Text, nullable=True)
+    portfolio_note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class RiskSnapshot(Base):
@@ -203,3 +230,78 @@ class EwmaState(Base):
     cov: Mapped[Decimal] = mapped_column(Numeric(18, 12))
     last_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class FilterState(Base):
+    __tablename__ = "filter_state"
+
+    key: Mapped[str] = mapped_column(String(80), primary_key=True)
+    payload: Mapped[str] = mapped_column(Text)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class RegimeSnapshot(Base):
+    __tablename__ = "regime_snapshots"
+
+    as_of: Mapped[datetime] = mapped_column(DateTime, primary_key=True)
+    label: Mapped[str] = mapped_column(String(16))
+    soft_calm: Mapped[Decimal] = mapped_column(Numeric(8, 4), default=0)
+    soft_elevated: Mapped[Decimal] = mapped_column(Numeric(8, 4), default=0)
+    soft_stress: Mapped[Decimal] = mapped_column(Numeric(8, 4), default=0)
+    vix: Mapped[Decimal | None] = mapped_column(Numeric(10, 4), nullable=True)
+    ewma_vol_ann: Mapped[Decimal | None] = mapped_column(Numeric(10, 6), nullable=True)
+    kalman_trend_z: Mapped[Decimal | None] = mapped_column(Numeric(10, 4), nullable=True)
+    nifty_vs_sma50: Mapped[Decimal | None] = mapped_column(Numeric(10, 4), nullable=True)
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    vix_source: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    computed_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class DailyPerformance(Base):
+    __tablename__ = "daily_performance"
+    __table_args__ = (UniqueConstraint("as_of", "symbol", name="uq_daily_perf"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    as_of: Mapped[datetime] = mapped_column(DateTime, index=True)
+    symbol: Mapped[str] = mapped_column(String(32), index=True)
+    company_name: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    day_pnl: Mapped[Decimal | None] = mapped_column(Numeric(20, 4), nullable=True)
+    day_pnl_pct: Mapped[Decimal | None] = mapped_column(Numeric(10, 4), nullable=True)
+    contribution: Mapped[Decimal | None] = mapped_column(Numeric(20, 4), nullable=True)
+    last_price: Mapped[Decimal | None] = mapped_column(Numeric(20, 4), nullable=True)
+    prev_close: Mapped[Decimal | None] = mapped_column(Numeric(20, 4), nullable=True)
+    selected: Mapped[bool] = mapped_column(Boolean, default=False)
+    why: Mapped[str | None] = mapped_column(String(40), nullable=True)
+
+
+class DailyNews(Base):
+    __tablename__ = "daily_news"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    as_of: Mapped[datetime] = mapped_column(DateTime, index=True)
+    symbol: Mapped[str] = mapped_column(String(32), index=True)
+    title: Mapped[str] = mapped_column(String(400))
+    url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    source: Mapped[str] = mapped_column(String(80), default="rss")
+    published: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    sentiment: Mapped[Decimal | None] = mapped_column(Numeric(8, 4), nullable=True)
+    aspect: Mapped[str] = mapped_column(String(24), default="Other")
+    rank: Mapped[Decimal | None] = mapped_column(Numeric(10, 4), nullable=True)
+    is_filing: Mapped[bool] = mapped_column(Boolean, default=False)
+    kept: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class DailyImpact(Base):
+    __tablename__ = "daily_attribution"
+    __table_args__ = (UniqueConstraint("as_of", "symbol", name="uq_daily_impact"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    as_of: Mapped[datetime] = mapped_column(DateTime, index=True)
+    symbol: Mapped[str] = mapped_column(String(32), index=True)
+    engine: Mapped[str] = mapped_column(String(24), default="rules")
+    takeaway: Mapped[str | None] = mapped_column(Text, nullable=True)
+    market_context: Mapped[str | None] = mapped_column(Text, nullable=True)
+    confidence: Mapped[Decimal | None] = mapped_column(Numeric(6, 2), nullable=True)
+    positives: Mapped[str | None] = mapped_column(Text, nullable=True)
+    negatives: Mapped[str | None] = mapped_column(Text, nullable=True)
+    payload: Mapped[str | None] = mapped_column(Text, nullable=True)

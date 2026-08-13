@@ -193,6 +193,9 @@ class RiskService:
             technical_detail=json.dumps({k: None if v is None else float(v) for k, v in parts.items()}),
             source="tape",
         )
+        from meridian.scoring.composite import CompositeService
+
+        CompositeService(self.session, self.settings).recompute(symbol)
         return True
 
     def _advance_ewma(self, symbol: str, aligned: AlignedSeries, lam: float, *, force: bool) -> Ewma | None:
