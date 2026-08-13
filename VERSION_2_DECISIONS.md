@@ -2,10 +2,10 @@
 
 **Status: LOCKED (product intent) · IMPLEMENTATION FROZEN until v1 complete**
 
-These answers close the research questions in `VERSION_2_EXPLORATION.md`.
+These answers close the research questions in `VERSION_2_EXPLORATION.md` and follow-on hedge/gamma questions.
 Do **not** start implementation until Meridian v1 (Phases 5–8 / `ARCHITECTURE.md`) is tagged complete.
 
-Companion files: `VERSION_2_TODO.md`, `VERSION_2_EXPLORATION.md`.
+Companion files: `VERSION_2_TODO.md`, `VERSION_2_EXPLORATION.md`, `docs/v2/HEDGE_REBALANCE_SKETCH.md`.
 
 ---
 
@@ -86,15 +86,67 @@ Faster research is a **by-product**, not the primary optimisation target for v2.
 
 ---
 
+## 6. Hedge book shape, dual policies, alerts, fills
+
+Answers to gamma / hedge research questions (2026-08-13).
+
+| # | Question | Locked answer |
+|---|----------|----------------|
+| 1 | Options vs futures | **Both** — long listed commodity **options** as a book **and** futures hedges |
+| 2 | Inventory protection vs vol | **Both, with separate policies** — do not merge into one silent engine |
+| 3 | Re-hedge cadence | **Intraday alerts** (not EOD-only) — still human ack; no auto-send |
+| 4 | Actual futures fills in journal | **Yes** — record fills for scalp / hedge P&L and post-mortems |
+
+### Policy separation (binding)
+
+| Policy ID | Intent | Typical target | Alert character |
+|-----------|--------|----------------|-----------------|
+| `inventory_hedge` | Protect inventory / target hedge ratio \(h^*\) | Partial or full offset of book lots | Band / regime breach → **Hedge REVIEW** |
+| `vol_harvest` (gamma scalp awareness) | Monetize **long** gamma vs implied | Often net Δ near 0 on option book | Δ drift / Γ posture → **Δ REVIEW** (scalp-aware), separate copy |
+
+- Separate config, separate prompt streams, separate journal tags.
+- UI must show **which policy** fired; never one generic “hedge” button for both intents.
+- **Short gamma** never labelled as “scalping edge”; use risk **warning** language only.
+
+### Intraday alerts (binding)
+
+- Alerts may fire **intraday** when marks/Δ move through bands (polling or event-driven job — implementer choice).
+- Each alert still requires **Explicit Acknowledge** (Accept / Dismiss / Snooze).
+- **No** broker routing; cooldown / snooze still apply to limit fatigue.
+- Laptop / local process constraints: document expected poll interval when implementing.
+
+### Fills and post-mortem (binding)
+
+- Journal supports **actual futures (and options) fills**: time, symbol/contract, side, lots, price, fees if known, link to prior intended-trade / alert.
+- Enable attribution: option mark (theta/vega residual) vs futures scalp/hedge P&L between alerts.
+- Primary metric remains post-mortems — fills make the loop measurable.
+
+### Non-goals (unchanged)
+
+- Automated gamma scalping **execution**
+- Unattended intraday order placement
+- OMS / SmartAPI / Kite live orders from Meridian
+
+### Design consequences (add)
+
+8. **Dual policy engine:** `inventory_hedge` + `vol_harvest` configs; shared exposure math (`docs/v2/HEDGE_REBALANCE_SKETCH.md`), different targets and copy.
+9. **Intraday alert worker:** band checks on refreshed marks; ack queue, not execution.
+10. **Fill legs on journal:** actual fills schema for post-mortem P&L.
+11. **Greeks feed:** Δ/Γ on option legs when available; futures Δ = 1, Γ = 0.
+
+---
+
 ## Design consequences (for implementers after v1)
 
 1. **Schema:** `watch_items` with `status = active | archived`; soft cap on active; commodity symbols with roll metadata.
 2. **Jobs:** Daily score/signal only `active`; archived excluded from heavy pipelines.
 3. **MCX module:** Contract calendar, roll rules, continuous series, UI contract label.
 4. **Signals UI:** Pending ack queue; dismiss/snooze; promote to `intended_trades`.
-5. **Journal:** Intended trades + outcomes hooks for post-mortems (primary metric).
+5. **Journal:** Intended trades + **actual fills** + outcomes hooks for post-mortems (primary metric).
 6. **FX/hedge strip:** Context + carefully worded review prompts; no execution path.
-7. **Non-goals unchanged:** No Kite/SmartAPI live orders, no unattended auto-trade.
+7. **Dual hedge policies:** inventory vs vol-harvest; separate prompts and tags.
+8. **Intraday alerts:** human-in-the-loop only.
+9. **Non-goals unchanged:** No Kite/SmartAPI live orders, no unattended auto-trade, no automated scalp execution.
 
 ---
 
@@ -103,12 +155,16 @@ Faster research is a **by-product**, not the primary optimisation target for v2.
 1. Watchlist active/archived + soft cap  
 2. MCX commodity marks + roll machinery (minimum viable continuous)  
 3. Signal families + **acknowledge** queue  
-4. Intended-trade notes → journal (post-mortem spine)  
-5. FX context + hedge **review** prompts (wording rules above)  
-6. Alerts / events / stress stubs as time allows  
+4. Intended-trade notes → journal (**fills** schema)  
+5. FX context + inventory **hedge review** prompts  
+6. Exposure aggregation + threshold policy (`docs/v2/HEDGE_REBALANCE_SKETCH.md`)  
+7. Option legs Δ/Γ + **vol_harvest** policy stream (separate from inventory)  
+8. Intraday alert worker (ack only)  
+9. Events / stress stubs / export as time allows  
 
 ---
 
 Locked: 2026-08-13  
-Source: product answers to exploration research questions  
+Hedge/gamma answers locked: 2026-08-13  
+Source: product answers to exploration + gamma research questions  
 Repo: `sanjaymaverick-cmd/portfolio`
