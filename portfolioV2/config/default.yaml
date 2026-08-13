@@ -1,0 +1,89 @@
+app:
+  name: MERIDIAN V2
+  subtitle: Research & hedge-review desk · India
+  host: 127.0.0.1
+  port: 8766
+  theme: dark
+  open_browser: true
+
+paths:
+  data_dir: "~/MeridianV2"
+  db_filename: meridian_v2.db
+  log_dir: "~/MeridianV2/logs"
+
+watchlist:
+  active_cap: 50
+
+# Flip any flag to false to mute that stream. Seeded desk keeps them on.
+modules:
+  watchlist: true
+  mcx: true
+  signals: true
+  journal: true
+  fx: true
+  inventory_hedge: true
+  vol_harvest: true
+  vega_defense: true
+  alerts: true
+
+alerts:
+  poll_seconds: 60
+  min_days_between_prompts: 2
+  snooze_hours: 24
+
+regime:
+  default_label: Elevated
+
+hedge:
+  roll_blackout_days: 3
+  min_days_between_prompts: 2
+  inventory:
+    GOLD:
+      h_star: 0.50
+      min_lots: 1.0
+      ratio_tol: 0.10
+      lot_step: 1.0
+      gamma_warn_abs: 0.15
+    CRUDEOIL:
+      h_star: 0.40
+      min_lots: 1.0
+      ratio_tol: 0.12
+      lot_step: 1.0
+      gamma_warn_abs: 0.0
+    SILVER:
+      h_star: 0.50
+      min_lots: 1.0
+      ratio_tol: 0.10
+      lot_step: 1.0
+      gamma_warn_abs: 0.0
+  vol_harvest:
+    min_lots: 1.0
+    lot_step: 1.0
+    ratio_tol: 0.10
+  vega:
+    GOLD:
+      vega_limit: 200000
+      warn_utilization: 0.80
+      nu_star: 0.0
+      lot_step: 1.0
+      hedge_vega_per_lot: 55000
+      hedge_delta: 0.48
+    CRUDEOIL:
+      vega_limit: 100000
+      warn_utilization: 0.80
+      nu_star: 0.0
+      lot_step: 1.0
+      hedge_vega_per_lot: 50000
+      hedge_delta: -0.40
+
+providers:
+  yfinance_enabled: true
+  price_ttl_minutes: 15
+  request_sleep_ms: 400
+
+fx:
+  pairs:
+    - USDINR
+    - EURUSD
+    - USDJPY
+  move_review_pct: 1.0

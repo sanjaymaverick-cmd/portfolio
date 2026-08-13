@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Journal{% endblock %}
+{% block stage %}
+  <div class="page-head">
+    <div>
+      <h1>Journal · post-mortems</h1>
+      <p>Primary success metric: link what the desk showed, what was acknowledged, what was intended, and what filled.</p>
+    </div>
+  </div>
+
+  <div class="context">
+    <form class="panel form-grid" method="post" action="/journal/intent">
+      <h3>Intended trade</h3>
+      <label>Policy
+        <select name="policy_kind">
+          <option>inventory_hedge</option>
+          <option>vol_harvest</option>
+          <option>vega_defense</option>
+          <option>signal</option>
+        </select>
+      </label>
+      <label>Symbol <input name="symbol" required></label>
+      <label>Side
+        <select name="side"><option>buy</option><option>sell</option></select>
+      </label>
+      <label>Lots <input name="lots" required type="number" step="0.01"></label>
+      <label>Contract <input name="contract_label"></label>
+      <label>Reason <input name="reason"></label>
+      <p><button class="btn primary" type="submit">Log intent</button></p>
+    </form>
+    <form class="panel form-grid" method="post" action="/journal/fill">
+      <h3>Actual fill</h3>
+      <label>Intent id <input name="intent_id" placeholder="preferred"></label>
+      <label>Symbol <input name="symbol"></label>
+      <label>Contract <input name="contract" required></label>
+      <label>Side
+        <select name="side"><option>buy</option><option>sell</option></select>
+      </label>
+      <label>Lots <input name="lots" required type="number" step="0.01"></label>
+      <label>Price <input name="price" required type="number" step="0.01"></label>
+      <label>Type
+        <select name="instrument_type">
+          <option>future</option>
+          <option>option</option>
+          <option>spot</option>
+        </select>
+      </label>
+      <p><button class="btn primary" type="submit">Log fill</button></p>
+    </form>
+  </div>
+
+  {% for row in rows %}
+  <article class="panel review">
+    <header>
+      <span class="tag {{ row.intent.policy_kind }}">{{ row.intent.policy_kind }}</span>
+      <strong class="num">#{{ row.intent.id }} {{ row.intent.side }} {{ row.intent.lots }} {{ row.intent.symbol }}</strong>
+      <span class="muted">{{ row.intent.created_at.strftime('%d %b %H:%M') }} · {{ row.intent.regime }}</span>
+    </header>
+    <p>{{ row.intent.reason }}</p>
+    <p class="muted">
+      Desk then: regime {{ row.regime_then or '—' }} score {{ row.score_then or '—' }} mark {{ row.mark_then or '—' }}
+      · later: regime {{ row.regime_now or '—' }} score {{ row.score_now or '—' }}
+    </p>
+    <form method="post" action="/journal/{{ row.intent.id }}/outcome">
+      <button class="btn" type="submit">Capture later snapshot</button>
+    </form>
+    <p class="muted">
+      Filled {{ row.fill_lots }} of {{ row.intent.lots }} · unfilled {{ row.unfilled }}
+      {% if row.mark %}
+        · later mark {{ row.mark_label or 'CONTINUOUS' }}
+        <span class="num">{{ '%.2f'|format(row.mark) }}</span>
+        <span class="q q-{{ row.mark_quality }}">{{ row.mark_quality }}</span>
+      {% endif %}
+    </p>
+    {% if row.fills %}
+    <table class="grid">
+      <thead><tr><th>Time</th><th>Contract</th><th>Side</th><th>Lots</th><th>Price</th><th>Type</th></tr></thead>
+      <tbody>
+        {% for f in row.fills %}
+        <tr>
+          <td class="num">{{ f.filled_at.strftime('%d %b %H:%M') }}</td>
+          <td>{{ f.contract }}</td>
+          <td>{{ f.side }}</td>
+          <td class="num">{{ f.lots }}</td>
+          <td class="num">{{ f.price }}</td>
+          <td>{{ f.instrument_type }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+  </article>
+  {% else %}
+  <p class="muted">Journal is empty. Accept a review with lots, or log an intent here.</p>
+  {% endfor %}
+{% endblock %}

@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}Watch{% endblock %}
+{% block stage %}
+  <div class="page-head">
+    <div>
+      <h1>Watch / research book</h1>
+      <p>Candidates before they join the live book. Soft cap {{ active_count }}/{{ cap }}. Archived names are not scored.</p>
+    </div>
+    <div class="cap-meter">
+      <span class="num">{{ active_count }} / {{ cap }}</span>
+      <div class="track"><span style="width: {{ (active_count / cap * 100) if cap else 0 }}%"></span></div>
+    </div>
+  </div>
+
+  {% if error %}
+  <div class="alert-rail"><strong>Cap</strong><span>{{ error }}</span></div>
+  {% elif cap_state and cap_state.warn %}
+  <div class="alert-rail"><strong>Cap</strong>
+    <span>
+      {% if cap_state.at_cap %}
+        Soft cap {{ cap }} reached. Archive a name before adding.
+      {% else %}
+        {{ cap_state.active }} / {{ cap }} active — {{ cap_state.remaining }} remaining.
+      {% endif %}
+    </span>
+  </div>
+  {% endif %}
+
+  <form class="panel form-grid" method="post" action="/watch/add">
+    <h3>Add research name</h3>
+    <label>Symbol <input name="symbol" required placeholder="RELIANCE or GOLD"></label>
+    <label>Asset
+      <select name="asset_class">
+        <option value="equity">equity</option>
+        <option value="commodity">commodity</option>
+        <option value="fx">fx</option>
+      </select>
+    </label>
+    <label>Stance
+      <select name="stance">
+        <option value="">—</option>
+        <option value="consider">consider</option>
+        <option value="wait">wait</option>
+        <option value="avoid">avoid</option>
+      </select>
+    </label>
+    <label>Sector <input name="sector" placeholder="banks / metals"></label>
+    <label>Notes <input name="notes" placeholder="Advisor note only"></label>
+    <p><button class="btn primary" type="submit">Add</button></p>
+  </form>
+
+  <table class="grid">
+    <thead>
+      <tr>
+        <th>Symbol</th><th>Book</th><th>Score</th><th>vs peers</th><th>Stance</th><th>Catalysts</th><th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>
+        <td>
+          <span class="num">{{ row.item.symbol }}</span>
+          <div class="muted">{{ row.item.asset_class }} · {{ row.item.sector or '—' }}</div>
+          <div class="muted">{{ row.item.notes }}</div>
+        </td>
+        <td>{% if row.in_book %}<span class="tag">live book</span>{% else %}<span class="tag">research</span>{% endif %}</td>
+        <td class="num">{% if row.score is not none %}{{ '%.1f'|format(row.score) }}{% else %}—{% endif %}</td>
+        <td class="num">{% if row.vs_peers is not none %}{{ '%+.1f'|format(row.vs_peers) }}{% else %}—{% endif %}</td>
+        <td>
+          <form method="post" action="/watch/{{ row.item.id }}/stance">
+            <select name="stance" onchange="this.form.submit()">
+              <option value="" {{ 'selected' if not row.item.stance else '' }}>—</option>
+              <option value="consider" {{ 'selected' if row.item.stance == 'consider' else '' }}>consider</option>
+              <option value="wait" {{ 'selected' if row.item.stance == 'wait' else '' }}>wait</option>
+              <option value="avoid" {{ 'selected' if row.item.stance == 'avoid' else '' }}>avoid</option>
+            </select>
+          </form>
+        </td>
+        <td>
+          {% for c in row.catalysts %}
+          <div class="muted">{{ c.kind }} {% if c.event_date %}{{ c.event_date }}{% endif %} {% if c.level %}{{ c.level }}{% endif %} {{ c.notes }}</div>
+          {% endfor %}
+          <form class="intent-row" method="post" action="/watch/{{ row.item.id }}/catalyst">
+            <input name="kind" placeholder="results/event/level" style="width:90px">
+            <input name="event_date" type="date">
+            <input name="notes" placeholder="note">
+            <button class="btn" type="submit">Link</button>
+          </form>
+        </td>
+        <td class="actions">
+          {% if row.item.status == 'active' %}
+          <form method="post" action="/watch/{{ row.item.id }}/archive"><button class="btn" type="submit">Archive</button></form>
+          {% else %}
+          <form method="post" action="/watch/{{ row.item.id }}/restore"><button class="btn" type="submit">Restore</button></form>
+          {% endif %}
+          <form method="post" action="/watch/{{ row.item.id }}/remove"><button class="btn" type="submit">Remove</button></form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" class="muted">Empty. Seed the demo desk or add a name.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endblock %}

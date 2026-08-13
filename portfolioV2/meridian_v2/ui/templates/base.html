@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MERIDIAN V2 · {% block title %}Command{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/meridian-v2.css">
+  <script src="https://unpkg.com/htmx.org@2.0.4" defer></script>
+</head>
+<body class="{{ theme }}">
+  <header class="mast">
+    <a class="brand" href="/">
+      <svg class="mark" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M4 18C8 10 12 7 20 6" stroke="currentColor" stroke-width="1.2"/>
+        <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
+        <path d="M16 4h4v4" stroke="currentColor" stroke-width="1.1"/>
+      </svg>
+      <span class="wordmark">MERIDIAN <em>V2</em></span>
+    </a>
+    <nav class="desk-nav" aria-label="Desk">
+      <a href="/" class="{{ 'active' if active == 'command' else '' }}">Command</a>
+      {% if modules.watchlist %}<a href="/watch" class="{{ 'active' if active == 'watch' else '' }}">Watch</a>{% endif %}
+      {% if modules.signals %}<a href="/signals" class="{{ 'active' if active == 'signals' else '' }}">Ack</a>{% endif %}
+      {% if modules.journal %}<a href="/journal" class="{{ 'active' if active == 'journal' else '' }}">Journal</a>{% endif %}
+      {% if modules.inventory_hedge %}<a href="/hedge" class="{{ 'active' if active == 'hedge' else '' }}">Inventory</a>{% endif %}
+      {% if modules.vol_harvest %}<a href="/harvest" class="{{ 'active' if active == 'harvest' else '' }}">Harvest</a>{% endif %}
+      {% if modules.vega_defense %}<a href="/vega" class="{{ 'active' if active == 'vega' else '' }}">Vega</a>{% endif %}
+      {% if modules.mcx %}<a href="/commodities" class="{{ 'active' if active == 'commodities' else '' }}">MCX</a>{% endif %}
+      <a href="/help" class="{{ 'active' if active == 'help' else '' }}">Help</a>
+      <a href="/export.md">Export</a>
+    </nav>
+    <div class="mast-meta">
+      <span class="regime {{ regime.tone }}"><span class="dot"></span>{{ regime.label }}</span>
+      {% for pair in fx[:1] %}
+      <span class="num">{{ pair.pair }} {{ '%.2f'|format(pair.last or 0) }}</span>
+      {% endfor %}
+      <span class="badge">ACK {{ pending_count }}</span>
+      <span class="num">{{ now.strftime('%d %b %Y  %H:%M') }}</span>
+    </div>
+  </header>
+
+  <div class="shell">
+    <aside class="rail">
+      <section>
+        <h2>Isolation</h2>
+        <p class="rail-note">This is <strong>MERIDIAN V2</strong>. It does not share the v1 book, schema, or window title.</p>
+        <p class="rail-meta">Port {{ port }}</p>
+        <p class="rail-meta num" title="{{ db_path }}">DB · meridian_v2.db</p>
+      </section>
+      <section>
+        <h2>Modules</h2>
+        <ul class="mods">
+          <li class="{{ 'on' if modules.inventory_hedge else 'off' }}">inventory_hedge</li>
+          <li class="{{ 'on' if modules.vol_harvest else 'off' }}">vol_harvest</li>
+          <li class="{{ 'on' if modules.vega_defense else 'off' }}">vega_defense</li>
+          <li class="{{ 'on' if modules.alerts else 'off' }}">alerts (ack only)</li>
+        </ul>
+      </section>
+      <div class="rail-actions">
+        <form method="post" action="/desk/alerts">
+          <button class="btn primary" type="submit">Run reviews once</button>
+        </form>
+        <form method="post" action="/desk/seed">
+          <button class="btn" type="submit">Seed demo desk</button>
+        </form>
+      </div>
+    </aside>
+    <main class="stage">
+      {% block stage %}{% endblock %}
+    </main>
+  </div>
+
+  <footer class="colophon">
+    <span>Advisory only · no execution · no Kite / SmartAPI</span>
+    <span>{{ subtitle }}</span>
+    <span>Separate app from MERIDIAN v1</span>
+  </footer>
+</body>
+</html>

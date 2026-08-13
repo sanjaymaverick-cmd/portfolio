@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Ack queue{% endblock %}
+{% block stage %}
+  <div class="page-head">
+    <div>
+      <h1>Explicit Acknowledge</h1>
+      <p>Accept / Dismiss / Snooze. After Accept you may log an intended-trade note. No orders are sent.</p>
+    </div>
+  </div>
+
+  {% for ev in pending %}
+  <article class="panel review">
+    <header>
+      <span class="tag {{ ev.policy_kind }}">{{ ev.policy_kind }}</span>
+      <strong class="num">{{ ev.symbol }}</strong>
+      <span class="muted">{{ ev.rule_name }} · {{ ev.regime }}</span>
+    </header>
+    <p>{{ ev.copy_review }}</p>
+    <form class="intent-row" method="post" action="/signals/{{ ev.id }}/ack" hx-post="/signals/{{ ev.id }}/ack" hx-target="body" hx-swap="outerHTML">
+      <input type="hidden" name="next_url" value="/signals">
+      <input type="hidden" name="action" value="accept">
+      <input name="side" placeholder="side (buy/sell)" >
+      <input name="lots" placeholder="lots">
+      <input name="contract_label" placeholder="contract label">
+      <input name="note" placeholder="intended-trade reason">
+      <button class="btn primary" type="submit">Accept</button>
+    </form>
+    <div class="actions">
+      <form method="post" action="/signals/{{ ev.id }}/ack" hx-post="/signals/{{ ev.id }}/ack" hx-target="body" hx-swap="outerHTML">
+        <input type="hidden" name="next_url" value="/signals">
+        <input type="hidden" name="action" value="dismiss">
+        <button class="btn" type="submit">Dismiss</button>
+      </form>
+      <form method="post" action="/signals/{{ ev.id }}/ack" hx-post="/signals/{{ ev.id }}/ack" hx-target="body" hx-swap="outerHTML">
+        <input type="hidden" name="next_url" value="/signals">
+        <input type="hidden" name="action" value="snooze">
+        <button class="btn" type="submit">Snooze</button>
+      </form>
+    </div>
+  </article>
+  {% else %}
+  <p class="muted">No pending items. Run reviews once from the rail.</p>
+  {% endfor %}
+
+  <h2 class="kicker" style="margin-top:24px">Recent</h2>
+  <table class="grid">
+    <thead><tr><th>When</th><th>Policy</th><th>Symbol</th><th>Status</th></tr></thead>
+    <tbody>
+      {% for ev in recent %}
+      <tr>
+        <td class="num">{{ ev.created_at.strftime('%d %b %H:%M') }}</td>
+        <td><span class="tag {{ ev.policy_kind }}">{{ ev.policy_kind }}</span></td>
+        <td class="num">{{ ev.symbol }}</td>
+        <td>{{ ev.status }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endblock %}

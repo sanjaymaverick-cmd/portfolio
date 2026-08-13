@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block stage %}
+  <div class="page-head">
+    <div>
+      <h1>{{ title }}</h1>
+      <p>Policy <span class="tag {{ policy_kind }}">{{ policy_kind }}</span> — never merged with the other hedge streams.</p>
+    </div>
+  </div>
+  {% for ev in pending %}
+  <article class="panel review">
+    <header>
+      <strong class="num">{{ ev.symbol }}</strong>
+      <span class="muted">{{ ev.regime }}</span>
+    </header>
+    <p>{{ ev.copy_review }}</p>
+    <div class="actions">
+      <form method="post" action="/signals/{{ ev.id }}/ack">
+        <input type="hidden" name="next_url" value="{{ request.url.path }}">
+        <input type="hidden" name="action" value="accept">
+        <button class="btn primary" type="submit">Accept</button>
+      </form>
+      <form method="post" action="/signals/{{ ev.id }}/ack">
+        <input type="hidden" name="next_url" value="{{ request.url.path }}">
+        <input type="hidden" name="action" value="dismiss">
+        <button class="btn" type="submit">Dismiss</button>
+      </form>
+      <form method="post" action="/signals/{{ ev.id }}/ack">
+        <input type="hidden" name="next_url" value="{{ request.url.path }}">
+        <input type="hidden" name="action" value="snooze">
+        <button class="btn" type="submit">Snooze</button>
+      </form>
+    </div>
+  </article>
+  {% else %}
+  <p class="muted">No open {{ policy_kind }} reviews.</p>
+  {% endfor %}
+{% endblock %}

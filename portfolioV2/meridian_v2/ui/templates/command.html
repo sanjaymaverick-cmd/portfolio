@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block title %}Command{% endblock %}
+{% block stage %}
+  <div class="page-head">
+    <div>
+      <h1>Command</h1>
+      <p>Policy streams stay separate. Copy is review / consider / note — never an order.</p>
+    </div>
+  </div>
+
+  <div class="hero">
+    <div class="metric">
+      <div class="label">Ack queue</div>
+      <div class="value num">{{ pending_count }}</div>
+      <div class="sub">Explicit acknowledge required</div>
+    </div>
+    <div class="metric">
+      <div class="label">Inventory reviews</div>
+      <div class="value num">{{ by_policy.inventory_hedge|length }}</div>
+      <div class="sub">HEDGE REVIEW</div>
+    </div>
+    <div class="metric">
+      <div class="label">Δ harvest</div>
+      <div class="value num">{{ by_policy.vol_harvest|length }}</div>
+      <div class="sub">Δ REVIEW · long Γ only</div>
+    </div>
+    <div class="metric">
+      <div class="label">Vega defense</div>
+      <div class="value num">{{ by_policy.vega_defense|length }}</div>
+      <div class="sub">VEGA REVIEW</div>
+    </div>
+    <div class="metric">
+      <div class="label">Book legs</div>
+      <div class="value num">{{ book|length }}</div>
+      <div class="sub">{{ options|length }} option · {{ hedges|length }} hedge</div>
+    </div>
+  </div>
+
+  {% if stress %}
+  <div class="alert-rail">
+    <strong>Stress stub</strong>
+    <span>{{ stress.copy }}</span>
+    <span class="num">USDINR {{ '%+.2f'|format(usdinr_move or 0) }}% · book ₹{{ '%.0f'|format(commodity_notional or 0) }}</span>
+  </div>
+  {% endif %}
+
+  <div class="alert-rail">
+    <strong>Macro</strong>
+    {% for pair in fx %}
+      <span class="num">{{ pair.pair }} {{ '%.3f'|format(pair.last or 0) }}
+        {% if pair.last and pair.prev_close %}
+          <span class="{{ 'up' if pair.last >= pair.prev_close else 'down' }}">
+            {{ '%+.2f'|format((pair.last - pair.prev_close) / pair.prev_close * 100) }}%
+          </span>
+        {% endif %}
+      </span>
+    {% else %}
+      <span>No FX marks yet. Seed the desk or wait for a provider refresh.</span>
+    {% endfor %}
+  </div>
+
+  <section class="context">
+    <div class="panel wide">
+      <h3>Commodity context · CONTINUOUS vs CONTRACT</h3>
+      <div class="tile-grid">
+        {% for tile in tiles %}
+        <div class="tile">
+          <div class="k">{{ tile.label }}</div>
+          <div class="v num">
+            {% if tile.mark.mark %}{{ '%.2f'|format(tile.mark.mark) }}{% else %}—{% endif %}
+          </div>
+          <div class="q q-{{ tile.mark.quality }}">{{ tile.mark.quality }}</div>
+        </div>
+        {% else %}
+        <p class="muted">No MCX metadata. Seed the demo desk.</p>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="panel">
+      <h3>Journal snippet</h3>
+      {% for intent in journal %}
+      <div class="snip">
+        <span class="tag">{{ intent.policy_kind }}</span>
+        <span class="num">{{ intent.side }} {{ intent.lots }} {{ intent.symbol }}</span>
+      </div>
+      {% else %}
+      <p class="muted">No intended trades yet. Accept a review to add one.</p>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="panel">
+    <h3>Pending reviews — separate tickets</h3>
+    {% if pending %}
+    <table class="grid">
+      <thead>
+        <tr>
+          <th>Policy</th>
+          <th>Symbol</th>
+          <th>Copy</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ev in pending %}
+        <tr>
+          <td><span class="tag {{ ev.policy_kind }}">{{ ev.policy_kind }}</span></td>
+          <td class="num">{{ ev.symbol }}</td>
+          <td>{{ ev.copy_review }}</td>
+          <td class="actions">
+            <form method="post" action="/signals/{{ ev.id }}/ack">
+              <input type="hidden" name="next_url" value="/">
+              <input type="hidden" name="action" value="accept">
+              <button class="btn" type="submit">Accept</button>
+            </form>
+            <form method="post" action="/signals/{{ ev.id }}/ack">
+              <input type="hidden" name="next_url" value="/">
+              <input type="hidden" name="action" value="dismiss">
+              <button class="btn" type="submit">Dismiss</button>
+            </form>
+            <form method="post" action="/signals/{{ ev.id }}/ack">
+              <input type="hidden" name="next_url" value="/">
+              <input type="hidden" name="action" value="snooze">
+              <button class="btn" type="submit">Snooze</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="muted">Queue is quiet. Run reviews once after seeding.</p>
+    {% endif %}
+  </section>
+{% endblock %}

@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}MCX{% endblock %}
+{% block stage %}
+  <div class="page-head">
+    <div>
+      <h1>MCX roll-aware marks</h1>
+      <p>Continuous series and specific contracts are labelled. A rolled contract is never shown as a bare equity ticker.</p>
+    </div>
+  </div>
+  <table class="grid">
+    <thead>
+      <tr>
+        <th>Key</th>
+        <th>UI label</th>
+        <th>Near</th>
+        <th>Next</th>
+        <th>Roll</th>
+        <th>Days</th>
+        <th>Mark</th>
+        <th>Quality</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>
+        <td class="num">{{ row.spec.symbol_key }}</td>
+        <td>{{ row.label }}</td>
+        <td class="num">{{ row.spec.near_label }}</td>
+        <td class="num">{{ row.spec.next_label }}</td>
+        <td class="num">{{ row.spec.roll_date }}</td>
+        <td class="num">{% if row.mark %}{{ row.mark.days_to_roll }}{% endif %}</td>
+        <td class="num">{% if row.mark and row.mark.mark %}{{ '%.2f'|format(row.mark.mark) }}{% else %}—{% endif %}</td>
+        <td><span class="q q-{{ row.mark.quality if row.mark else 'missing' }}">{{ row.mark.quality if row.mark else 'missing' }}</span></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="8" class="muted">Seed the demo desk to load the roll calendar.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endblock %}

@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Help{% endblock %}
+{% block stage %}
+  <div class="page-head">
+    <div>
+      <h1>Human execution loop</h1>
+      <p>Meridian sizes and prompts. The human executes at the broker. There is no OMS.</p>
+    </div>
+  </div>
+  <div class="panel">
+    <h3>Sequence</h3>
+    <ol class="help">
+      <li>Fresh marks + Greeks (actionable lots mute if stale).</li>
+      <li>Policies fire separately: inventory_hedge, vol_harvest, vega_defense.</li>
+      <li>Explicit Acknowledge — Accept / Dismiss / Snooze.</li>
+      <li>Optional intended-trade note tagged with <span class="tag">policy_kind</span>.</li>
+      <li>Human trades at the broker. Options change vega; futures clean residual Δ.</li>
+      <li>Log fills against the intent. Re-mark. New review only if still offside.</li>
+    </ol>
+  </div>
+  <div class="panel">
+    <h3>Gamma hedge vs harvest vs inventory</h3>
+    <table class="grid">
+      <thead><tr><th>Book</th><th>Policy</th><th>What the desk emits</th></tr></thead>
+      <tbody>
+        <tr><td>Inventory / futures (Γ ≈ 0)</td><td><span class="tag inventory_hedge">inventory_hedge</span></td><td>HEDGE REVIEW toward h* — futures only</td></tr>
+        <tr><td>Long gamma, Δ drifted</td><td><span class="tag vol_harvest">vol_harvest</span></td><td>Δ REVIEW — flatten residual delta; do not sell the option book</td></tr>
+        <tr><td>Short gamma</td><td><span class="tag vol_harvest">vol_harvest</span></td><td>Risk warning only — never “scalping edge”</td></tr>
+        <tr><td>Vega over limit</td><td><span class="tag vega_defense">vega_defense</span></td><td>VEGA REVIEW — options first, then futures Δ clean-up</td></tr>
+        <tr><td>All three at once</td><td>separate tickets</td><td>Three acks. Never one mixed hedge button.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="panel">
+    <h3>Copy rules</h3>
+    <p>Use review / consider / note. Never “you should hedge”, “execute”, “buy USD”, or “must reduce”.</p>
+  </div>
+  <div class="panel">
+    <h3>Isolation from v1</h3>
+    <p>Package <span class="num">meridian_v2</span> · DB <span class="num">{{ db_path }}</span> · port <span class="num">{{ port }}</span> · window title MERIDIAN V2. The v1 package <span class="num">meridian</span> is not imported.</p>
+  </div>
+{% endblock %}
