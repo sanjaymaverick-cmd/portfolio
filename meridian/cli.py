@@ -27,6 +27,12 @@ def main(argv: list[str] | None = None) -> int:
     imp.add_argument("--broker", default=None)
     prices = sub.add_parser("prices", help="Mark the book to the yfinance tape")
     prices.add_argument("--force", action="store_true")
+    funds = sub.add_parser("fundamentals", help="Refresh Screener.in Quality and Valuation")
+    funds.add_argument("--force", action="store_true")
+    funds.add_argument("--symbol", default=None)
+    risk = sub.add_parser("risk", help="Compute technicals, ρ and β vs Nifty from the cached tape")
+    risk.add_argument("--force", action="store_true")
+    risk.add_argument("--symbol", default=None)
     args = parser.parse_args(argv)
 
     setup_logging()
@@ -40,6 +46,10 @@ def main(argv: list[str] | None = None) -> int:
         return _import(Path(args.file), args.account, args.broker)
     if args.cmd == "prices":
         return _prices(force=args.force)
+    if args.cmd == "fundamentals":
+        return _fundamentals(force=args.force, symbol=args.symbol)
+    if args.cmd == "risk":
+        return _risk(force=args.force, symbol=args.symbol)
     return _serve()
 
 
@@ -78,6 +88,48 @@ def _prices(*, force: bool) -> int:
             return 1
         failed = f", failed {', '.join(result.failed)}" if result.failed else ""
         print(f"marked {result.marked}, skipped {result.skipped}{failed}")
+        return 0
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+def _fundamentals(*, force: bool, symbol: str | None) -> int:
+    from meridian.scoring.service import FundamentalService
+    from meridian.storage.db import get_session
+
+    session = get_session()
+    try:
+        result = FundamentalService(session).refresh(force=force, symbol=symbol)
+        session.commit()
+        if result.error:
+            print(result.error, file=sys.stderr)
+            return 1
+        failed = f", failed {', '.join(result.failed)}" if result.failed else ""
+        print(f"fundamentals marked {result.marked}, skipped {result.skipped}{failed}")
+        return 0 if not result.failed or result.marked else 1
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+def _risk(*, force: bool, symbol: str | None) -> int:
+    from meridian.risk.service import RiskService
+    from meridian.storage.db import get_session
+
+    session = get_session()
+    try:
+        result = RiskService(session).compute(force=force, symbol=symbol)
+        session.commit()
+        if result.error:
+            print(result.error, file=sys.stderr)
+            return 1
+        failed = f", failed {', '.join(result.failed)}" if result.failed else ""
+        print(f"risk marked {result.marked}, skipped {result.skipped}{failed} nifty={result.nifty}")
         return 0
     except Exception:
         session.rollback()

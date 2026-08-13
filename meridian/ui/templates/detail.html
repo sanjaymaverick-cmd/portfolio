@@ -7,7 +7,11 @@
       <p class="mist">{{ holding.company_name }} · {{ holding.exchange }} · {{ holding.sector }} · {{ holding.mcap }} · {{ holding.yahoo }}</p>
     </div>
     <div style="text-align:right">
+      {% if holding.quality is not none or holding.valuation is not none or holding.technical is not none %}
+      <span class="badge hold">Q {{ '%.1f'|format(holding.quality|float) if holding.quality is not none else '—' }} · V {{ '%.1f'|format(holding.valuation|float) if holding.valuation is not none else '—' }} · T {{ '%.1f'|format(holding.technical|float) if holding.technical is not none else '—' }}</span>
+      {% else %}
       <span class="badge hold">Unscored</span>
+      {% endif %}
       <p class="muted" style="margin:8px 0 0">Weight {{ weight|pct if weight is not none else '—' }} of book</p>
     </div>
   </div>
@@ -24,7 +28,19 @@
       </div>
       <div class="panel" style="margin-bottom:12px">
         <h3>Rolling ρ and EWMA β vs Nifty</h3>
-        <div class="placeholder">Dual-axis risk series · Phase 4</div>
+        {% if risk_chart %}
+        <div class="chart-frame">{{ risk_chart|safe }}</div>
+        <dl class="kv" style="margin-top:10px">
+          <dt>ρ ({{ risk.window if risk else 60 }}d)</dt><dd class="num">{% if risk and risk.rho is not none %}{{ '%.2f'|format(risk.rho|float) }}{% else %}—{% endif %}</dd>
+          <dt>OLS β</dt><dd class="num">{% if risk and risk.beta_ols is not none %}{{ '%.2f'|format(risk.beta_ols|float) }}{% else %}—{% endif %}</dd>
+          <dt>EWMA β</dt><dd class="num">{% if risk and risk.beta_ewma is not none %}{{ '%.2f'|format(risk.beta_ewma|float) }}{% else %}—{% endif %}</dd>
+          <dt>Shrunk β</dt><dd class="num">{% if risk and risk.beta_shrunk is not none %}{{ '%.2f'|format(risk.beta_shrunk|float) }}{% else %}—{% endif %}</dd>
+          <dt>RSI</dt><dd class="num">{% if risk and risk.rsi is not none %}{{ '%.1f'|format(risk.rsi|float) }}{% else %}—{% endif %}</dd>
+          <dt>RS vs Nifty</dt><dd class="num">{% if risk and risk.rs_nifty is not none %}{{ '%.1f'|format(risk.rs_nifty|float) }} pp{% else %}—{% endif %}</dd>
+        </dl>
+        {% else %}
+        <div class="placeholder">Compute risk from the cached tape</div>
+        {% endif %}
       </div>
       <div class="panel">
         <h3>Ownership</h3>
@@ -35,7 +51,25 @@
       <div class="panel" style="margin-bottom:12px">
         <h3>Factor scores</h3>
         <div class="factor-list">
-          {% for name in ['Quality','Valuation','Momentum','Ownership','Sentiment'] %}
+          {% set qpct = (holding.quality * 10) if holding.quality is not none else 0 %}
+          {% set vpct = (holding.valuation * 10) if holding.valuation is not none else 0 %}
+          {% set tpct = (holding.technical * 10) if holding.technical is not none else 0 %}
+          <div>
+            <span>Quality</span>
+            <div class="track"><span style="width: {{ qpct }}%"></span></div>
+            <span class="num">{{ '%.1f'|format(holding.quality|float) if holding.quality is not none else '—' }}</span>
+          </div>
+          <div>
+            <span>Valuation</span>
+            <div class="track"><span style="width: {{ vpct }}%"></span></div>
+            <span class="num">{{ '%.1f'|format(holding.valuation|float) if holding.valuation is not none else '—' }}</span>
+          </div>
+          <div>
+            <span>Momentum</span>
+            <div class="track"><span style="width: {{ tpct }}%"></span></div>
+            <span class="num">{{ '%.1f'|format(holding.technical|float) if holding.technical is not none else '—' }}</span>
+          </div>
+          {% for name in ['Ownership','Sentiment'] %}
           <div>
             <span>{{ name }}</span>
             <div class="track"><span style="width:0%"></span></div>
@@ -43,6 +77,63 @@
           </div>
           {% endfor %}
         </div>
+        {% if quality_parts %}
+        <p class="muted" style="margin:10px 0 0;font-size:11px">
+          Quality drivers:
+          {% for k, v in quality_parts.items() %}
+            {{ k }} {{ '%.1f'|format(v) if v is not none else '—' }}{% if not loop.last %} · {% endif %}
+          {% endfor %}
+        </p>
+        {% endif %}
+        {% if valuation_parts %}
+        <p class="muted" style="margin:6px 0 0;font-size:11px">
+          Valuation drivers:
+          {% for k, v in valuation_parts.items() %}
+            {{ k }} {{ '%.1f'|format(v) if v is not none else '—' }}{% if not loop.last %} · {% endif %}
+          {% endfor %}
+        </p>
+        {% endif %}
+        {% if technical_parts %}
+        <p class="muted" style="margin:6px 0 0;font-size:11px">
+          Momentum drivers:
+          {% for k, v in technical_parts.items() %}
+            {{ k }} {{ '%.1f'|format(v) if v is not none else '—' }}{% if not loop.last %} · {% endif %}
+          {% endfor %}
+        </p>
+        {% endif %}
+      </div>
+      <div class="panel" style="margin-bottom:12px">
+        <h3>Fundamentals</h3>
+        {% if fundamental %}
+        <dl class="kv">
+          <dt>Source</dt><dd>{{ fundamental.source }}{% if fundamental.fetched_at %} · {{ fundamental.fetched_at.strftime('%d %b %Y') }}{% endif %}</dd>
+          <dt>Sector</dt><dd>{{ fundamental.sector or '—' }}</dd>
+          <dt>ROE</dt><dd class="num">{{ fundamental.roe }}{% if fundamental.roe is not none %}%{% endif %}</dd>
+          <dt>ROCE</dt><dd class="num">{{ fundamental.roce }}{% if fundamental.roce is not none %}%{% endif %}</dd>
+          <dt>OPM</dt><dd class="num">{{ fundamental.opm }}{% if fundamental.opm is not none %}%{% endif %}</dd>
+          <dt>D/E</dt><dd class="num">{{ fundamental.debt_to_equity }}</dd>
+          <dt>CFO / OP</dt><dd class="num">{{ fundamental.cfo_to_op }}</dd>
+          <dt>P/E</dt><dd class="num">{{ fundamental.pe }}</dd>
+          <dt>P/B</dt><dd class="num">{{ fundamental.pb }}</dd>
+          <dt>EV / EBITDA</dt><dd class="num">{{ fundamental.ev_ebitda }}</dd>
+          <dt>Sales CAGR 5y</dt><dd class="num">{{ fundamental.sales_cagr_5y }}{% if fundamental.sales_cagr_5y is not none %}%{% endif %}</dd>
+          <dt>Profit CAGR 5y</dt><dd class="num">{{ fundamental.profit_cagr_5y }}{% if fundamental.profit_cagr_5y is not none %}%{% endif %}</dd>
+        </dl>
+        <form method="post" action="/fundamentals/refresh" style="margin-top:12px">
+          <input type="hidden" name="next_url" value="/holdings/{{ holding.id }}">
+          <input type="hidden" name="force" value="1">
+          <input type="hidden" name="symbol" value="{{ holding.symbol }}">
+          <button class="btn" type="submit">Refresh this name</button>
+        </form>
+        {% else %}
+        <p class="reasoning">No fundamentals on this name. Refresh to pull Screener.in (yfinance if Screener is down).</p>
+        <form method="post" action="/fundamentals/refresh" style="margin-top:12px">
+          <input type="hidden" name="next_url" value="/holdings/{{ holding.id }}">
+          <input type="hidden" name="force" value="1">
+          <input type="hidden" name="symbol" value="{{ holding.symbol }}">
+          <button class="btn" type="submit">Fetch fundamentals</button>
+        </form>
+        {% endif %}
       </div>
       <div class="panel" style="margin-bottom:12px">
         <h3>Recommendation</h3>
@@ -53,8 +144,8 @@
           ({{ holding.pnl_pct|pct }})</span>.
           Session P&amp;L vs prior close is
           <span class="{{ holding.day_pnl|sclass }}">{{ holding.day_pnl|inr_s }} ({{ holding.day_pnl_pct|pct }})</span>.
-          Factor scores, regime-conditioned SHAP, and an action will appear here from Phase 6.
-          Until then this page is the marked lot — not advice.
+          Quality, Valuation, and Momentum are marked. Ownership, regime, and SHAP arrive later.
+          Until then this page is a marked lot with three factors — not advice.
         </p>
       </div>
       <div class="panel" style="margin-bottom:12px">

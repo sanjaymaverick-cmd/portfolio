@@ -146,6 +146,69 @@ def _svg_line(symbol: str, bars: list[PriceBar]) -> str:
     )
 
 
+def risk_chart_html(symbol: str, points) -> str:  # noqa: ANN001
+    usable = [p for p in points if p.rho is not None or p.beta_ewma is not None]
+    if len(usable) < 3:
+        return ""
+    try:
+        import plotly.graph_objects as go
+        from plotly.subplots import make_subplots
+    except ImportError:
+        return ""
+    dates = [p.bar_date for p in usable]
+    figure = make_subplots(specs=[[{"secondary_y": True}]])
+    figure.add_trace(
+        go.Scatter(
+            x=dates,
+            y=[None if p.rho is None else float(p.rho) for p in usable],
+            mode="lines",
+            name="ρ vs Nifty",
+            line=dict(width=1.4, color=GOLD),
+        ),
+        secondary_y=False,
+    )
+    figure.add_trace(
+        go.Scatter(
+            x=dates,
+            y=[None if p.beta_ewma is None else float(p.beta_ewma) for p in usable],
+            mode="lines",
+            name="EWMA β",
+            line=dict(width=1.4, color=MIST),
+        ),
+        secondary_y=True,
+    )
+    figure.update_layout(
+        paper_bgcolor=INK,
+        plot_bgcolor=INK,
+        font=dict(family="IBM Plex Sans, Segoe UI, sans-serif", color=MIST, size=11),
+        margin=dict(l=48, r=48, t=8, b=24),
+        height=240,
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0, font=dict(size=10)),
+        hovermode="x unified",
+    )
+    figure.update_xaxes(gridcolor=LINE, zeroline=False, tickfont=dict(size=10))
+    figure.update_yaxes(
+        title_text="ρ",
+        gridcolor=LINE,
+        range=[-0.2, 1.05],
+        tickfont=dict(family="IBM Plex Mono, Consolas, monospace", size=10, color=IVORY),
+        secondary_y=False,
+    )
+    figure.update_yaxes(
+        title_text="β",
+        gridcolor=LINE,
+        showgrid=False,
+        tickfont=dict(family="IBM Plex Mono, Consolas, monospace", size=10, color=MIST),
+        secondary_y=True,
+    )
+    return figure.to_html(
+        full_html=False,
+        include_plotlyjs=False,
+        config={"displaylogo": False, "modeBarButtonsToRemove": ["lasso2d", "select2d"]},
+        div_id=f"risk-{symbol.lower()}",
+    )
+
+
 def as_decimal(value: Decimal | float | int | None) -> Decimal | None:
     if value is None:
         return None

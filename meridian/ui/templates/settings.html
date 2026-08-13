@@ -36,6 +36,7 @@
           <dt>Theme</dt><dd>{{ settings.app.theme }}</dd>
           <dt>Tape TTL</dt><dd class="num">{{ settings.providers.price_ttl_minutes }} min</dd>
           <dt>Last mark</dt><dd class="num">{% if tape.last_ok %}{{ tape.last_ok.strftime('%d %b %Y %H:%M') }}{% else %}never{% endif %}</dd>
+          <dt>Screener TTL</dt><dd class="num">{{ settings.providers.screener_ttl_hours }} h</dd>
         </dl>
       </div>
       <div class="panel">

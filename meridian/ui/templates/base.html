@@ -63,6 +63,16 @@
           <input type="hidden" name="force" value="1">
           <button class="btn primary" type="submit">Mark to market</button>
         </form>
+        <form method="post" action="/fundamentals/refresh">
+          <input type="hidden" name="next_url" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
+          <input type="hidden" name="force" value="1">
+          <button class="btn" type="submit">Refresh fundamentals</button>
+        </form>
+        <form method="post" action="/risk/refresh">
+          <input type="hidden" name="next_url" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
+          <input type="hidden" name="force" value="1">
+          <button class="btn" type="submit">Compute risk</button>
+        </form>
         <a class="btn" href="/import">Import statement</a>
         <button class="btn" type="button" data-open="manual">Add position</button>
       </div>
@@ -75,7 +85,7 @@
   <footer class="colophon">
     <span>Advisory only · no execution</span>
     <span>{{ subtitle }}</span>
-    <span>Local book · yfinance tape</span>
+    <span>Local book · tape + Screener</span>
   </footer>
   <script src="/vendor/plotly.min.js"></script>
 

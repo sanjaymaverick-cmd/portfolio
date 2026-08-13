@@ -20,6 +20,8 @@ Desk opens at `http://127.0.0.1:8787`.
 ```powershell
 python -m meridian import --file statement.csv --account "Core — Zerodha"
 python -m meridian prices --force
+python -m meridian fundamentals --force
+python -m meridian risk
 python -m pytest
 ```
 
@@ -27,4 +29,4 @@ Data lives in `./data` (gitignored). Nothing leaves the machine unless you later
 
 ## Status
 
-Phase 2 — local book plus a cached yfinance tape, day P&L, and OHLCV charts.
+Phase 4 — tape, Screener Q/V, technicals, and Nifty ρ / β.

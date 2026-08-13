@@ -15,7 +15,7 @@ Local-first equity advisory desk for NSE and BSE. Advisor and monitor only — n
 | Ingestion | pandas / openpyxl / pdfplumber | Broker CSV, Excel, PDF |
 | Logging | loguru | Rotating local logs, graceful degradation |
 | Prices | yfinance (`.NS` / `.BO` fallback), SQLite quote + bar cache | Phase 2 |
-| Later: fundamentals | Screener.in, cached + rate-limited | Phase 3 |
+| Fundamentals | Screener.in (cached, polite) + yfinance fallback | Phase 3 |
 | Later: explain | LightGBM/XGBoost surrogate + SHAP | Phase 6 |
 | Charts | Plotly, custom styled | Phase 2+ |
 
@@ -31,9 +31,9 @@ meridian/
   domain/                money, symbols, view models
   storage/               schema, session, repositories, seed
   ingestion/             detect, map, parse CSV/XLSX/PDF
-  data_providers/        yfinance tape; later screener, news
-  scoring/               (phase 3+) factors, regime, shap
-  risk/                  (phase 4+) correlation, beta, EWMA
+  data_providers/        yfinance tape; Screener.in; later news
+  scoring/               Quality + Valuation; later regime, SHAP
+  risk/                  ρ, OLS β, EWMA β, technicals
   recommendations/       (phase 6+) action + reasoning
   api/                   JSON for future web / automation
   ui/                    pages, templates, static
@@ -43,11 +43,11 @@ meridian/
 
 1. **Done.** Accounts, ingestion, local book, Command / Holdings / Detail chrome.
 2. **Done.** yfinance tape, `.NS`/`.BO` fallback, quote + OHLCV cache, day P&L, Plotly price chart.
-3. Screener.in fundamentals · Quality & Valuation.
-4. Technical factor · Nifty correlation · rolling / EWMA beta.
-5. Five-factor engine · regime.
+3. **Done.** Screener.in fundamentals · Quality & Valuation (0–10), yfinance fallback.
+4. **Done.** Technical factor · Nifty ρ · rolling OLS / recursive EWMA β · dual-axis charts.
+5. Ownership + Sentiment · five-factor · regime (Calm / Elevated / Stress).
 6. SHAP · recommendation copy.
-7. Final UI polish.
-8. News / alerts / packaging.
+7. End-of-day price–news impact (movers, filings, attribution).
+8. Polish · alerts · packaging.
 
-Page loads never block on the network. `Mark to market` / `python -m meridian prices` is the only Yahoo call.
+Page loads never block on the network. Explicit jobs: `prices`, `fundamentals`, `risk`.

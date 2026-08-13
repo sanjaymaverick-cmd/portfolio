@@ -22,8 +22,13 @@
     </div>
   </div>
   <div class="metric">
-    <div class="label">Largest weight</div>
-    <div class="value num">{{ book.top_weight|pct if book.top_weight is not none else '—' }}</div>
-    <div class="sub">{{ book.top_symbol or '—' }}</div>
+    <div class="label">Book β / ρ</div>
+    {% if book_risk and book_risk.beta_shrunk is not none %}
+    <div class="value num">{{ '%.2f'|format(book_risk.beta_shrunk|float) }}</div>
+    <div class="sub">ρ {{ '%.2f'|format(book_risk.rho|float) if book_risk.rho is not none else '—' }} · vs Nifty</div>
+    {% else %}
+    <div class="value num muted">—</div>
+    <div class="sub">Compute risk from tape</div>
+    {% endif %}
   </div>
 </section>

@@ -30,7 +30,7 @@
         <th class="r">P&amp;L</th>
         <th class="r">%</th>
         <th>Rec</th>
-        <th class="r">Score</th>
+        <th class="r">Q · V · T</th>
       </tr>
     </thead>
     <tbody>
@@ -50,7 +50,7 @@
         <td class="r num {{ h.pnl|sclass }}">{{ h.pnl|inr_s }}</td>
         <td class="r num {{ h.pnl_pct|sclass }}">{{ h.pnl_pct|pct }}</td>
         <td><span class="badge hold">{{ h.recommendation }}</span></td>
-        <td class="r muted">{{ h.score if h.score is not none else '—' }}</td>
+        <td class="r num muted">{% if h.quality is not none or h.valuation is not none or h.technical is not none %}{{ '%.1f'|format(h.quality|float) if h.quality is not none else '—' }} · {{ '%.1f'|format(h.valuation|float) if h.valuation is not none else '—' }} · {{ '%.1f'|format(h.technical|float) if h.technical is not none else '—' }}{% else %}—{% endif %}</td>
       </tr>
       {% else %}
       <tr><td colspan="15" class="empty">No holdings in this view.</td></tr>

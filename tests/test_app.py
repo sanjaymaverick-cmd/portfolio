@@ -13,3 +13,6 @@ def test_desk_pages_render() -> None:
     tape = client.get("/api/tape")
     assert tape.status_code == 200
     assert "stale" in tape.json()
+    missing = client.get("/api/fundamentals/NOSUCH")
+    assert missing.status_code == 200
+    assert missing.json()["status"] == "missing"

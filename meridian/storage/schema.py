@@ -110,3 +110,96 @@ class PriceBar(Base):
     low: Mapped[Decimal] = mapped_column(Numeric(20, 4))
     close: Mapped[Decimal] = mapped_column(Numeric(20, 4))
     volume: Mapped[Decimal] = mapped_column(Numeric(20, 2), default=0)
+
+
+class Fundamental(Base):
+    __tablename__ = "fundamentals"
+
+    symbol: Mapped[str] = mapped_column(String(32), primary_key=True)
+    source: Mapped[str] = mapped_column(String(24), default="screener")
+    screener_url: Mapped[str | None] = mapped_column(String(240), nullable=True)
+    company_name: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    sector: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    industry: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    market_cap_cr: Mapped[Decimal | None] = mapped_column(Numeric(20, 4), nullable=True)
+    current_price: Mapped[Decimal | None] = mapped_column(Numeric(20, 4), nullable=True)
+    pe: Mapped[Decimal | None] = mapped_column(Numeric(12, 4), nullable=True)
+    book_value: Mapped[Decimal | None] = mapped_column(Numeric(20, 4), nullable=True)
+    pb: Mapped[Decimal | None] = mapped_column(Numeric(12, 4), nullable=True)
+    dividend_yield: Mapped[Decimal | None] = mapped_column(Numeric(10, 4), nullable=True)
+    roce: Mapped[Decimal | None] = mapped_column(Numeric(10, 4), nullable=True)
+    roe: Mapped[Decimal | None] = mapped_column(Numeric(10, 4), nullable=True)
+    roe_5y: Mapped[Decimal | None] = mapped_column(Numeric(10, 4), nullable=True)
+    opm: Mapped[Decimal | None] = mapped_column(Numeric(10, 4), nullable=True)
+    opm_5y_mean: Mapped[Decimal | None] = mapped_column(Numeric(10, 4), nullable=True)
+    opm_5y_std: Mapped[Decimal | None] = mapped_column(Numeric(10, 4), nullable=True)
+    debt_to_equity: Mapped[Decimal | None] = mapped_column(Numeric(12, 4), nullable=True)
+    cfo_to_op: Mapped[Decimal | None] = mapped_column(Numeric(10, 4), nullable=True)
+    ev_ebitda: Mapped[Decimal | None] = mapped_column(Numeric(12, 4), nullable=True)
+    sales_cagr_3y: Mapped[Decimal | None] = mapped_column(Numeric(10, 4), nullable=True)
+    sales_cagr_5y: Mapped[Decimal | None] = mapped_column(Numeric(10, 4), nullable=True)
+    profit_cagr_3y: Mapped[Decimal | None] = mapped_column(Numeric(10, 4), nullable=True)
+    profit_cagr_5y: Mapped[Decimal | None] = mapped_column(Numeric(10, 4), nullable=True)
+    fetched_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    as_of: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class FactorScore(Base):
+    __tablename__ = "factor_scores"
+
+    symbol: Mapped[str] = mapped_column(String(32), primary_key=True)
+    quality: Mapped[Decimal | None] = mapped_column(Numeric(6, 2), nullable=True)
+    valuation: Mapped[Decimal | None] = mapped_column(Numeric(6, 2), nullable=True)
+    technical: Mapped[Decimal | None] = mapped_column(Numeric(6, 2), nullable=True)
+    ownership: Mapped[Decimal | None] = mapped_column(Numeric(6, 2), nullable=True)
+    sentiment: Mapped[Decimal | None] = mapped_column(Numeric(6, 2), nullable=True)
+    composite: Mapped[Decimal | None] = mapped_column(Numeric(6, 2), nullable=True)
+    quality_detail: Mapped[str | None] = mapped_column(Text, nullable=True)
+    valuation_detail: Mapped[str | None] = mapped_column(Text, nullable=True)
+    technical_detail: Mapped[str | None] = mapped_column(Text, nullable=True)
+    scored_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    source: Mapped[str] = mapped_column(String(24), default="screener")
+
+
+class RiskSnapshot(Base):
+    __tablename__ = "risk_snapshots"
+
+    symbol: Mapped[str] = mapped_column(String(32), primary_key=True)
+    yahoo: Mapped[str] = mapped_column(String(40))
+    rho: Mapped[Decimal | None] = mapped_column(Numeric(10, 4), nullable=True)
+    beta_ols: Mapped[Decimal | None] = mapped_column(Numeric(10, 4), nullable=True)
+    beta_ewma: Mapped[Decimal | None] = mapped_column(Numeric(10, 4), nullable=True)
+    beta_shrunk: Mapped[Decimal | None] = mapped_column(Numeric(10, 4), nullable=True)
+    rsi: Mapped[Decimal | None] = mapped_column(Numeric(10, 4), nullable=True)
+    sma20: Mapped[Decimal | None] = mapped_column(Numeric(20, 4), nullable=True)
+    sma50: Mapped[Decimal | None] = mapped_column(Numeric(20, 4), nullable=True)
+    sma200: Mapped[Decimal | None] = mapped_column(Numeric(20, 4), nullable=True)
+    rs_nifty: Mapped[Decimal | None] = mapped_column(Numeric(10, 4), nullable=True)
+    volume_ratio: Mapped[Decimal | None] = mapped_column(Numeric(10, 4), nullable=True)
+    last_close: Mapped[Decimal | None] = mapped_column(Numeric(20, 4), nullable=True)
+    window: Mapped[int] = mapped_column(Integer, default=60)
+    as_of: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    computed_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class RiskPoint(Base):
+    __tablename__ = "risk_points"
+    __table_args__ = (UniqueConstraint("symbol", "bar_date", name="uq_risk_point"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    symbol: Mapped[str] = mapped_column(String(32), index=True)
+    bar_date: Mapped[datetime] = mapped_column(DateTime, index=True)
+    rho: Mapped[Decimal | None] = mapped_column(Numeric(10, 4), nullable=True)
+    beta_ewma: Mapped[Decimal | None] = mapped_column(Numeric(10, 4), nullable=True)
+
+
+class EwmaState(Base):
+    __tablename__ = "ewma_state"
+
+    symbol: Mapped[str] = mapped_column(String(32), primary_key=True)
+    var_m: Mapped[Decimal] = mapped_column(Numeric(18, 12))
+    var_i: Mapped[Decimal] = mapped_column(Numeric(18, 12))
+    cov: Mapped[Decimal] = mapped_column(Numeric(18, 12))
+    last_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

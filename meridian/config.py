@@ -38,11 +38,16 @@ class MarketCfg(BaseModel):
     currency: str = "INR"
     correlation_window: int = 60
     ewma_lambda: float = 0.94
+    beta_shrinkage: float = 0.15
+    rsi_period: int = 14
+    nifty_fallback: str = "NIFTYBEES.NS"
 
 
 class ProvidersCfg(BaseModel):
     yfinance_enabled: bool = True
+    screener_enabled: bool = True
     screener_ttl_hours: int = 24
+    screener_sleep_ms: int = 900
     price_ttl_minutes: int = 15
     history_days: int = 220
     news_ttl_minutes: int = 30

@@ -40,6 +40,14 @@ class HoldingView(BaseModel):
     updated_at: datetime | None = None
     recommendation: str = "—"
     score: Decimal | None = None
+    quality: Decimal | None = None
+    valuation: Decimal | None = None
+    technical: Decimal | None = None
+    rho: Decimal | None = None
+    beta: Decimal | None = None
+    beta_ols: Decimal | None = None
+    beta_ewma: Decimal | None = None
+    rsi: Decimal | None = None
     spark: str = ""
 
     @computed_field  # type: ignore[prop-decorator]

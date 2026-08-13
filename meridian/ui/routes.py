@@ -18,9 +18,13 @@ from meridian.domain.money import to_decimal
 from meridian.data_providers.service import PriceService
 from meridian.ingestion.columns import FIELD_ALIASES
 from meridian.ingestion.service import ImportService
+from meridian.scoring.service import FundamentalService
+from meridian.storage.fundamentals import FactorRepo, FundamentalRepo
 from meridian.storage.repositories import AccountRepo, HoldingRepo, ImportRepo
 from meridian.storage.seed import seed_demo
-from meridian.ui.charts import price_chart_html, sparkline
+from meridian.risk.service import BOOK, RiskService
+from meridian.storage.risk import RiskRepo
+from meridian.ui.charts import price_chart_html, risk_chart_html, sparkline
 from meridian.ui.formatters import FILTERS
 
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
@@ -48,6 +52,8 @@ def _ctx(request: Request, session: Session, **extra: Any) -> dict[str, Any]:
         "accounts": accounts,
         "account_id": account_id,
         "tape": tape,
+        "book_risk": RiskRepo(session).get(BOOK),
+        "market": settings.market,
         "regime": {"label": "Unscored", "tone": "idle", "note": "Regime engine arrives in Phase 5."},
         **extra,
     }
@@ -55,9 +61,24 @@ def _ctx(request: Request, session: Session, **extra: Any) -> dict[str, Any]:
 
 def _with_sparks(session, views):  # noqa: ANN001
     service = PriceService(session)
+    factors = FactorRepo(session).map_for([view.symbol for view in views])
     for view in views:
         closes = service.closes(view.yahoo, limit=30)
         view.spark = sparkline(closes)
+        row = factors.get(view.symbol)
+        if row:
+            view.quality = row.quality
+            view.valuation = row.valuation
+            view.technical = row.technical
+    risks = RiskRepo(session).map_for([view.symbol for view in views])
+    for view in views:
+        risk = risks.get(view.symbol)
+        if risk:
+            view.rho = risk.rho
+            view.beta = risk.beta_shrunk or risk.beta_ewma
+            view.beta_ols = risk.beta_ols
+            view.beta_ewma = risk.beta_ewma
+            view.rsi = risk.rsi
     return views
 
 
@@ -136,6 +157,17 @@ def holding_detail(
     service = PriceService(session)
     bars = service.bars.list(view.yahoo, limit=get_settings().providers.history_days)
     chart = price_chart_html(view.symbol, bars)
+    factor = FactorRepo(session).get(view.symbol)
+    if factor:
+        view.quality = factor.quality
+        view.valuation = factor.valuation
+        view.technical = factor.technical
+    fundamental = FundamentalRepo(session).get(view.symbol)
+    risk = RiskRepo(session).get(view.symbol)
+    if risk:
+        view.rho = risk.rho
+        view.beta = risk.beta_shrunk or risk.beta_ewma
+    risk_chart = risk_chart_html(view.symbol, RiskRepo(session).points(view.symbol))
     return templates.TemplateResponse(
         request,
         "detail.html",
@@ -147,6 +179,13 @@ def holding_detail(
             weight=weight,
             book=book,
             chart_html=chart,
+            factor=factor,
+            fundamental=fundamental,
+            quality_parts=_parts(factor.quality_detail if factor else None),
+            valuation_parts=_parts(factor.valuation_detail if factor else None),
+            technical_parts=_parts(factor.technical_detail if factor else None),
+            risk=risk,
+            risk_chart=risk_chart,
             bar_count=len(bars),
         ),
     )
@@ -162,6 +201,30 @@ def refresh_tape(
     PriceService(session).refresh(force=bool(force), history=True)
     target = next_url if next_url.startswith("/") else "/"
     return RedirectResponse(target, status_code=303)
+
+
+@router.post("/fundamentals/refresh")
+def refresh_fundamentals(
+    request: Request,
+    session: Session = Depends(db_session),
+    next_url: str = Form("/"),
+    force: str = Form(""),
+    symbol: str = Form(""),
+) -> RedirectResponse:
+    FundamentalService(session).refresh(force=bool(force), symbol=symbol or None)
+    target = next_url if next_url.startswith("/") else "/"
+    return RedirectResponse(target, status_code=303)
+
+
+def _parts(raw: str | None) -> dict[str, float | None]:
+    if not raw:
+        return {}
+    import json
+
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        return {}
 
 
 @router.get("/import", response_class=HTMLResponse)
@@ -286,11 +349,32 @@ async def edit_holding_form(
 def risk_page(request: Request, session: Session = Depends(db_session)) -> HTMLResponse:
     repo = HoldingRepo(session)
     rows = repo.list()
+    views = _with_sparks(session, [repo.to_view(row) for row in rows])
+    ranked = sorted(views, key=lambda item: abs(float(item.beta or 0)), reverse=True)
     return templates.TemplateResponse(
         request,
         "risk.html",
-        _ctx(request, session, active="risk", book=repo.summary(rows)),
+        _ctx(
+            request,
+            session,
+            active="risk",
+            book=repo.summary(rows),
+            holdings=ranked,
+            risk_chart=risk_chart_html(BOOK, RiskRepo(session).points(BOOK)),
+        ),
     )
+
+
+@router.post("/risk/refresh")
+def refresh_risk(
+    request: Request,
+    session: Session = Depends(db_session),
+    next_url: str = Form("/risk"),
+    force: str = Form(""),
+) -> RedirectResponse:
+    RiskService(session).compute(force=bool(force))
+    target = next_url if next_url.startswith("/") else "/risk"
+    return RedirectResponse(target, status_code=303)
 
 
 @router.get("/alerts", response_class=HTMLResponse)

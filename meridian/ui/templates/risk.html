@@ -4,8 +4,13 @@
   <div class="page-head">
     <div>
       <h1>Risk &amp; regime</h1>
-      <p>Nifty and VIX are on the tape. Portfolio β / ρ arrives in Phase 4.</p>
+      <p>Current-weight book vs Nifty 50. EWMA λ={{ market.ewma_lambda }}. Shrinkage {{ '%.0f'|format(market.beta_shrinkage * 100) }}% toward 1.0.</p>
     </div>
+    <form method="post" action="/risk/refresh">
+      <input type="hidden" name="next_url" value="/risk">
+      <input type="hidden" name="force" value="1">
+      <button class="btn primary" type="submit">Recompute</button>
+    </form>
   </div>
   {% include "partials/hero.html" %}
   <section class="context">
@@ -17,19 +22,71 @@
         <dt>India VIX</dt>
         <dd class="num {{ tape.vix_chg|sclass }}">{% if tape.vix_last is not none %}{{ '%.2f'|format(tape.vix_last|float) }} · {{ tape.vix_chg|pct }}{% else %}—{% endif %}</dd>
       </dl>
-      <p class="reasoning" style="margin-top:12px">Rule-based Calm / Elevated / Stress will consume these series plus FII/DII in Phase 5. Thresholds are already in config (VIX {{ '%.0f'|format(16) }} / {{ '%.0f'|format(22) }}).</p>
+      <p class="reasoning" style="margin-top:12px">Rule-based Calm / Elevated / Stress will consume VIX, FII/DII and the Nifty trend in Phase 5.</p>
     </div>
     <div class="panel">
       <h3>Portfolio β</h3>
-      <div class="placeholder">Rolling OLS + EWMA λ=0.94</div>
+      {% if book_risk and book_risk.beta_ols is not none %}
+      <dl class="kv">
+        <dt>OLS {{ book_risk.window }}d</dt><dd class="num">{{ '%.2f'|format(book_risk.beta_ols|float) }}</dd>
+        <dt>EWMA λ</dt><dd class="num">{{ '%.2f'|format(book_risk.beta_ewma|float) if book_risk.beta_ewma is not none else '—' }}</dd>
+        <dt>Shrunk</dt><dd class="num">{{ '%.2f'|format(book_risk.beta_shrunk|float) if book_risk.beta_shrunk is not none else '—' }}</dd>
+      </dl>
+      {% else %}
+      <div class="placeholder">Compute risk from tape</div>
+      {% endif %}
     </div>
     <div class="panel">
       <h3>Correlation vs Nifty</h3>
+      {% if book_risk and book_risk.rho is not none %}
+      <div class="value num" style="font-size:26px;margin:8px 0 4px">{{ '%.2f'|format(book_risk.rho|float) }}</div>
+      <p class="muted">Current-weight daily returns, {{ book_risk.window }} sessions</p>
+      {% else %}
       <div class="placeholder">60-day default window</div>
+      {% endif %}
     </div>
     <div class="panel">
       <h3>Factor exposure</h3>
-      <div class="placeholder">Quality · Value · Momentum · Ownership · Sentiment</div>
+      <p class="muted">Quality · Value live. Momentum live. Ownership · Sentiment later.</p>
     </div>
   </section>
+  {% if risk_chart %}
+  <div class="panel" style="margin-bottom:16px">
+    <h3>Book EWMA β and rolling ρ</h3>
+    <div class="chart-frame">{{ risk_chart|safe }}</div>
+  </div>
+  {% endif %}
+  <h2 class="kicker">Name β (shrunk)</h2>
+  <div class="table-wrap">
+    <table class="book">
+      <thead>
+        <tr>
+          <th>Symbol</th>
+          <th>Name</th>
+          <th class="r">ρ</th>
+          <th class="r">OLS β</th>
+          <th class="r">EWMA β</th>
+          <th class="r">Shrunk</th>
+          <th class="r">RSI</th>
+          <th class="r">T</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for h in holdings %}
+        <tr>
+          <td class="sym"><a class="row-link" href="/holdings/{{ h.id }}">{{ h.symbol }}</a></td>
+          <td class="name">{{ h.company_name }}</td>
+          <td class="r num">{{ '%.2f'|format(h.rho|float) if h.rho is not none else '—' }}</td>
+          <td class="r num">{{ '%.2f'|format(h.beta_ols|float) if h.beta_ols is not none else '—' }}</td>
+          <td class="r num">{{ '%.2f'|format(h.beta_ewma|float) if h.beta_ewma is not none else '—' }}</td>
+          <td class="r num">{{ '%.2f'|format(h.beta|float) if h.beta is not none else '—' }}</td>
+          <td class="r num">{{ '%.1f'|format(h.rsi|float) if h.rsi is not none else '—' }}</td>
+          <td class="r num">{{ '%.1f'|format(h.technical|float) if h.technical is not none else '—' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8" class="empty">Compute risk to populate this desk.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 {% endblock %}

@@ -49,6 +49,9 @@ def _migrate(engine: Engine) -> None:
         statements.append("ALTER TABLE holdings ADD COLUMN prev_close NUMERIC(20, 4)")
     if "price_asof" not in cols:
         statements.append("ALTER TABLE holdings ADD COLUMN price_asof DATETIME")
+    factor_cols = {column["name"] for column in inspect(engine).get_columns("factor_scores")} if "factor_scores" in inspect(engine).get_table_names() else set()
+    if factor_cols and "technical_detail" not in factor_cols:
+        statements.append("ALTER TABLE factor_scores ADD COLUMN technical_detail TEXT")
     if not statements:
         return
     with engine.begin() as connection:

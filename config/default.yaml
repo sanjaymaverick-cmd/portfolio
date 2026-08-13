@@ -21,10 +21,15 @@ market:
   currency: INR
   correlation_window: 60
   ewma_lambda: 0.94
+  beta_shrinkage: 0.15
+  rsi_period: 14
+  nifty_fallback: "NIFTYBEES.NS"
 
 providers:
   yfinance_enabled: true
+  screener_enabled: true
   screener_ttl_hours: 24
+  screener_sleep_ms: 900
   price_ttl_minutes: 15
   history_days: 220
   news_ttl_minutes: 30
