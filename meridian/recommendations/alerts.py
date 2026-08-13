@@ -67,7 +67,7 @@ def volume_hit(symbol: str, volume_ratio: float | None, *, threshold: float) -> 
         symbol=symbol,
         severity="watch",
         title=f"{symbol} volume {volume_ratio:.2f}× recent average",
-        detail="Tape dry-up versus the recent average. Delivery % is not on this tape.",
+        detail="Trading volume is much lower than usual. Delivery figures are not available here.",
         metric=volume_ratio,
     )
 
@@ -90,7 +90,7 @@ def results_hit(
         kind="results",
         symbol=symbol,
         severity="info",
-        title=f"{symbol} results in the tape",
+        title=f"{symbol} results in today's news",
         detail=lead,
         metric=float(len(titles)),
     )

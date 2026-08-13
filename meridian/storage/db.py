@@ -22,7 +22,7 @@ def get_engine() -> Engine:
             f"sqlite:///{settings.db_path}",
             future=True,
             echo=False,
-            connect_args={"check_same_thread": False},
+            connect_args={"check_same_thread": False, "timeout": 30},
         )
 
         @event.listens_for(_engine, "connect")
@@ -30,6 +30,7 @@ def get_engine() -> Engine:
             cursor = dbapi_connection.cursor()
             cursor.execute("PRAGMA foreign_keys=ON")
             cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA busy_timeout=30000")
             cursor.close()
 
         _SessionLocal = sessionmaker(bind=_engine, autoflush=False, expire_on_commit=False, future=True)

@@ -32,20 +32,12 @@ def rule_attribution(
             (positives if (day_pct or 0) >= 0 else negatives).append(driver)
     positives.sort(key=lambda row: row["strength"], reverse=True)
     negatives.sort(key=lambda row: row["strength"], reverse=True)
-    direction = "higher" if (day_pct or 0) > 0 else "lower" if (day_pct or 0) < 0 else "unchanged"
-    move = f"{day_pct:+.2f}%" if day_pct is not None else "n/a"
     if headlines:
         lead = headlines[0].title
-        takeaway = f"{symbol} {direction} ({move}). Cited: {lead}"
+        takeaway = f"{symbol} {_move_words(day_pct)}. News: {lead}"
     else:
-        takeaway = f"{symbol} {direction} ({move}). No same-day headlines cleared the relevance gate."
-    market = "Nifty context unavailable."
-    if nifty_chg is not None:
-        market = f"Nifty session {nifty_chg:+.2f}%."
-        if day_pct is not None and abs(day_pct) > abs(nifty_chg) + 0.8:
-            market += " Move is name-specific versus the index."
-        elif day_pct is not None and day_pct * nifty_chg > 0:
-            market += " Direction aligns with the tape."
+        takeaway = f"{symbol} {_move_words(day_pct)}. No useful company news found for today."
+    market = market_line(nifty_chg, day_pct)
     n = len([h for h in headlines if h.kept])
     confidence = 0.35 if n == 0 else min(0.78, 0.42 + 0.06 * n)
     return {
@@ -97,6 +89,89 @@ def _driver(item: object, headlines: list[Headline] | None = None) -> dict[str, 
         "source": str(item.get("source") or "unknown")[:80],
         "aspect": str(item.get("aspect") or "Other")[:24],
     }
+
+
+def engine_label(engine: str | None) -> str:
+    key = (engine or "rules").lower()
+    if key == "llm":
+        return "From headlines (AI)"
+    return "From headlines"
+
+
+def why_label(why: str | None) -> str | None:
+    return {
+        "threshold": "moved more than 1.5%",
+        "contribution": "large rupee move",
+    }.get(why or "", why)
+
+
+def market_line(nifty_chg: float | None, day_pct: float | None) -> str:
+    if nifty_chg is None:
+        return "Nifty figure not available."
+    nifty = _nifty_words(nifty_chg)
+    if day_pct is not None and abs(day_pct) > abs(nifty_chg) + 0.8:
+        return f"{nifty} This stock moved more than Nifty — look at company news, not just the market."
+    if day_pct is not None and day_pct * nifty_chg > 0:
+        return f"{nifty} It moved the same way as Nifty."
+    return nifty
+
+
+def simplify_market(text: str | None) -> str | None:
+    if not text:
+        return text
+    out = text
+    out = out.replace("Nifty context unavailable.", "Nifty figure not available.")
+    out = re.sub(
+        r"Nifty session ([+-]?\d+(?:\.\d+)?)%\.",
+        lambda match: _nifty_words(float(match.group(1))),
+        out,
+    )
+    out = out.replace(
+        " Move is name-specific versus the index.",
+        " This stock moved more than Nifty — look at company news, not just the market.",
+    )
+    out = out.replace(" Direction aligns with the tape.", " It moved the same way as Nifty.")
+    return out
+
+
+def simplify_takeaway(text: str | None) -> str | None:
+    if not text:
+        return text
+    out = text.replace("Cited:", "News:")
+    out = out.replace(
+        "No same-day headlines cleared the relevance gate.",
+        "No useful company news found for today.",
+    )
+    out = re.sub(
+        r" higher \(([+-]?\d+(?:\.\d+)?)%\)",
+        lambda match: f" rose {abs(float(match.group(1))):.2f}%",
+        out,
+    )
+    out = re.sub(
+        r" lower \(([+-]?\d+(?:\.\d+)?)%\)",
+        lambda match: f" fell {abs(float(match.group(1))):.2f}%",
+        out,
+    )
+    out = re.sub(r" unchanged \(([+-]?\d+(?:\.\d+)?)%\)", r" was unchanged (\1%)", out)
+    return out
+
+
+def _move_words(day_pct: float | None) -> str:
+    if day_pct is None:
+        return "price not marked"
+    if day_pct > 0:
+        return f"rose {day_pct:.2f}%"
+    if day_pct < 0:
+        return f"fell {abs(day_pct):.2f}%"
+    return "was unchanged"
+
+
+def _nifty_words(nifty_chg: float) -> str:
+    if nifty_chg > 0.05:
+        return f"Nifty was up {nifty_chg:.2f}% today."
+    if nifty_chg < -0.05:
+        return f"Nifty was down {abs(nifty_chg):.2f}% today."
+    return f"Nifty was almost flat today ({nifty_chg:+.2f}%)."
 
 
 def _cites_known(text: str, headlines: list[Headline]) -> bool:

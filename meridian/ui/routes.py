@@ -30,6 +30,7 @@ from meridian.storage.attributions import AttributionRepo
 from meridian.storage.eod import EodRepo, decode_list
 from meridian.storage.alerts import AlertRepo, WatchRepo
 from meridian.recommendations.alert_service import AlertService
+from meridian.recommendations.eod_rules import engine_label, simplify_market, simplify_takeaway, why_label
 from meridian.recommendations.eod_service import EodService
 from meridian.domain.symbols import normalize_symbol
 from meridian.ui.charts import price_chart_html, risk_chart_html, shap_bar_html, sparkline
@@ -128,7 +129,7 @@ def command(request: Request, session: Session = Depends(db_session)) -> HTMLRes
             movers=movers,
             eod_cards=eod_cards,
             eod_as_of=eod_as_of,
-            open_alerts=_refresh_alerts(session, views, limit=3),
+            open_alerts=_open_alerts(session, views, limit=3),
             jobs=ImportRepo(session).recent(5),
         ),
     )
@@ -284,20 +285,24 @@ def _eod_cards(session: Session, views) -> tuple[list[dict[str, Any]], datetime 
                 "day_pct": perf.day_pnl_pct,
                 "day_pnl": perf.day_pnl,
                 "contribution": perf.contribution,
-                "why": perf.why,
-                "engine": impact.engine if impact else None,
-                "takeaway": impact.takeaway if impact else None,
+                "why": why_label(perf.why),
+                "engine": engine_label(impact.engine if impact else None),
+                "takeaway": simplify_takeaway(impact.takeaway if impact else None),
                 "confidence": impact.confidence if impact else None,
                 "positives": decode_list(impact.positives) if impact else [],
                 "negatives": decode_list(impact.negatives) if impact else [],
-                "market": impact.market_context if impact else None,
+                "market": simplify_market(impact.market_context if impact else None),
             }
         )
     return cards, day
 
 
-def _refresh_alerts(session: Session, views, *, limit: int | None = None) -> list[dict[str, Any]]:  # noqa: ANN001
-    AlertService(session).evaluate()
+def _with_note(target: str, note: str) -> str:
+    sep = "&" if "?" in target else "?"
+    return f"{target}{sep}note={note}"
+
+
+def _open_alerts(session: Session, views, *, limit: int | None = None) -> list[dict[str, Any]]:  # noqa: ANN001
     ids = {view.symbol: view.id for view in views}
     out: list[dict[str, Any]] = []
     for row in AlertRepo(session).open_alerts(limit=limit):
@@ -324,9 +329,9 @@ def _eod_timeline(session: Session, symbol: str) -> list[dict[str, Any]]:
         out.append(
             {
                 "as_of": impact.as_of,
-                "engine": impact.engine,
-                "takeaway": impact.takeaway,
-                "market": impact.market_context,
+                "engine": engine_label(impact.engine),
+                "takeaway": simplify_takeaway(impact.takeaway),
+                "market": simplify_market(impact.market_context),
                 "confidence": impact.confidence,
                 "positives": decode_list(impact.positives),
                 "negatives": decode_list(impact.negatives),
@@ -493,16 +498,23 @@ def refresh_eod(
     next_url: str = Form("/"),
     force: str = Form(""),
 ) -> RedirectResponse:
-    EodService(session).run(force=bool(force), fetch=True)
-    target = next_url if next_url.startswith("/") else "/"
-    return RedirectResponse(target, status_code=303)
+    from loguru import logger
+
+    try:
+        EodService(session).run(force=bool(force), fetch=True)
+        AlertService(session).evaluate()
+        return RedirectResponse("/?note=eod_ok", status_code=303)
+    except Exception:
+        logger.exception("eod refresh failed")
+        session.rollback()
+        return RedirectResponse("/?note=eod_fail", status_code=303)
 
 
 @router.get("/alerts", response_class=HTMLResponse)
 def alerts_page(request: Request, session: Session = Depends(db_session)) -> HTMLResponse:
     repo = HoldingRepo(session)
     views = [repo.to_view(row) for row in repo.list()]
-    open_alerts = _refresh_alerts(session, views)
+    open_alerts = _open_alerts(session, views)
     history = AlertRepo(session).recent(limit=30)
     return templates.TemplateResponse(
         request,

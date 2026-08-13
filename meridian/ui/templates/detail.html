@@ -162,7 +162,7 @@
         <div class="timeline">
           {% for item in eod_timeline %}
           <article class="timeline-item">
-            <div class="when">{{ item.as_of.strftime('%d %b %Y') }} · {{ item.engine }}{% if item.confidence is not none %} · {{ '%.0f'|format(item.confidence|float * 100) }}%{% endif %}</div>
+            <div class="when">{{ item.as_of.strftime('%d %b %Y') }} · {{ item.engine }}{% if item.confidence is not none %} · how sure {{ '%.0f'|format(item.confidence|float * 100) }}%{% endif %}</div>
             <p class="reasoning">{{ item.takeaway }}</p>
             {% if item.positives or item.negatives %}
             <ul class="driver-list">
