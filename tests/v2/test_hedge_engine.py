@@ -99,6 +99,84 @@ def snap_check(rev) -> float:
     return rev.drift_lots_actionable
 
 
+def test_ratio_breach_fires_below_min_lots():
+    # Small book: hedge is far off-target by ratio (h_act ~0.40 vs h_star 0.70)
+    # but the lot drift is below min_lots. The ratio band must still breach.
+    as_of = date(2026, 8, 13)
+    book = [
+        BookLeg(
+            "b1",
+            "GOLD",
+            AssetClass.COMMODITY,
+            lots=2.0,
+            multiplier=100.0,
+            mark_inr=70000.0,
+        )
+    ]
+    # -0.8 effective hedge lots on a +2 book → h_act = 0.40.
+    hedges = [
+        HedgeLeg(
+            "h1",
+            "GOLD",
+            AssetClass.COMMODITY,
+            lots=-0.8,
+            multiplier=100.0,
+            mark_inr=70000.0,
+        )
+    ]
+    exp = aggregate_exposure("GOLD", AssetClass.COMMODITY, book, hedges, as_of)
+    pol = HedgeRebalancePolicy(
+        symbols=(
+            SymbolPolicy(
+                symbol="GOLD",
+                h_star=0.70,
+                # min_lots=2.0 so the 0.6-lot drift is below the lot trigger;
+                # only the ratio_tol trigger can flag this.
+                band=RebalanceBand(min_lots=2.0, ratio_tol=0.10),
+                lot_step=1.0,
+            ),
+        )
+    )
+    rev = evaluate_symbol(exp, pol.symbols[0], pol, RegimeLabel.ELEVATED)
+    assert abs(rev.drift_lots) < 2.0  # below min_lots → lot trigger does not fire
+    assert rev.h_actual is not None and abs(rev.h_actual - 0.70) > 0.10
+    assert rev.band_breached is True
+    assert rev.urgency != "none"
+
+
+def test_delta_adjusted_book_notional_matches_hedge_convention():
+    # A book option leg with delta=0.5: book_notional must be delta-adjusted
+    # (same convention as hedge legs) so hedge_ratio measures like-for-like risk.
+    as_of = date(2026, 8, 13)
+    book = [
+        BookLeg(
+            "b1",
+            "GOLD",
+            AssetClass.COMMODITY,
+            lots=4.0,
+            multiplier=100.0,
+            mark_inr=70000.0,
+            delta=0.5,
+        )
+    ]
+    # -2.0 effective hedge lots exactly offsets the 2.0 effective book lots.
+    hedges = [
+        HedgeLeg(
+            "h1",
+            "GOLD",
+            AssetClass.COMMODITY,
+            lots=-2.0,
+            multiplier=100.0,
+            mark_inr=70000.0,
+        )
+    ]
+    exp = aggregate_exposure("GOLD", AssetClass.COMMODITY, book, hedges, as_of)
+    # effective book lots = 4 * 0.5 = 2.0; fully hedged → ratio ~1.0.
+    assert exp.book_lots == 2.0
+    assert exp.book_notional_inr == 2.0 * 100.0 * 70000.0
+    assert exp.hedge_ratio is not None and abs(exp.hedge_ratio - 1.0) < 1e-9
+
+
 def test_vol_harvest_tag_in_copy():
     as_of = date(2026, 8, 13)
     book = [

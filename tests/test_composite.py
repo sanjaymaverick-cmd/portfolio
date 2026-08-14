@@ -5,7 +5,7 @@ from decimal import Decimal
 from pathlib import Path
 
 from meridian.data_providers.screener import parse_company_html
-from meridian.scoring.composite import blend_weights, composite_score, map_action
+from meridian.scoring.composite import blend_weights, brief_reason, composite_score, map_action
 from meridian.scoring.ownership import score_ownership
 from meridian.scoring.sentiment import score_sentiment
 from meridian.storage.schema import FactorScore, RegimeSnapshot
@@ -77,3 +77,32 @@ def test_action_gates_tighten_in_stress() -> None:
     )
     score = composite_score(row, blend_weights(calm))
     assert score is not None and Decimal("5") < score < Decimal("8")
+
+
+def test_brief_reason_only_lists_genuinely_low_factors() -> None:
+    # Bottom two are technical 6.5 (supportive) and sentiment 5.5 (a real
+    # constraint). Only the sub-6 factor should be named as a constraint.
+    row = FactorScore(
+        symbol="X",
+        quality=Decimal("8.0"),
+        valuation=Decimal("7.0"),
+        technical=Decimal("6.5"),
+        ownership=Decimal("7.0"),
+        sentiment=Decimal("5.5"),
+    )
+    reason = brief_reason(row, "Buy", "Calm")
+    assert "Constrained by sentiment 5.5." in reason
+    assert "technical" not in reason  # 6.5 is supportive, not a constraint
+
+
+def test_brief_reason_no_constraint_when_all_supportive() -> None:
+    row = FactorScore(
+        symbol="Y",
+        quality=Decimal("8.0"),
+        valuation=Decimal("7.5"),
+        technical=Decimal("7.0"),
+        ownership=Decimal("6.5"),
+        sentiment=Decimal("6.2"),
+    )
+    reason = brief_reason(row, "Buy", "Calm")
+    assert "Constrained by" not in reason

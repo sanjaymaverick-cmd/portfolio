@@ -145,7 +145,7 @@ class CompositeService:
         if symbol:
             rows = [self.factors.get(symbol)]
         else:
-            rows = list(self.factors.map_for([]).values()) if False else _all_factors(self.factors)
+            rows = _all_factors(self.factors)
         written = 0
         for row in rows:
             if row is None:
@@ -187,7 +187,7 @@ def brief_reason(row: FactorScore, action: str, regime: str | None) -> str:
         return "Insufficient factors for an action."
     parts.sort(key=lambda item: item[1], reverse=True)
     high = ", ".join(f"{n} {v:.1f}" for n, v in parts[:2])
-    low = ", ".join(f"{n} {v:.1f}" for n, v in parts[-2:] if parts[-1][1] < 6)
+    low = ", ".join(f"{n} {v:.1f}" for n, v in parts[-2:] if v < 6)
     desk = f" under {regime}" if regime else ""
     tail = f" Constrained by {low}." if low else ""
     return f"{action}{desk}. Supported by {high}.{tail}"

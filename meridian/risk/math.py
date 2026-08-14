@@ -142,7 +142,9 @@ def seed_ewma(asset: list[float], market: list[float], lam: float, warmup: int =
     _, beta = corr_beta(asset[:take], market[:take])
     var_m = _var(market[:take]) or 1e-8
     var_i = _var(asset[:take]) or 1e-8
-    cov = (beta or 1.0) * var_m
+    # Fall back to beta=1.0 only when corr_beta could not compute one (None);
+    # a genuine beta of 0.0 (uncorrelated over the warmup) must be preserved.
+    cov = (1.0 if beta is None else beta) * var_m
     state = Ewma(var_m=var_m, var_i=var_i, cov=cov, lam=lam)
     for r_i, r_m in zip(asset[take:], market[take:], strict=False):
         state.update(r_i, r_m)
