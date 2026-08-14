@@ -375,6 +375,33 @@ def commodities(request: Request):
         session.close()
 
 
+@router.get("/review")
+def review_page(request: Request):
+    symbol = (request.query_params.get("symbol") or "GOLD").strip().upper() or "GOLD"
+    session = get_session()
+    try:
+        from meridian_v2.risk.review_service import build_desk_review
+
+        regime = current_regime(session, get_settings())
+        payload = build_desk_review(session, symbol, regime=regime)
+        return TEMPLATES.TemplateResponse(
+            request,
+            "review.html",
+            _ctx(
+                request,
+                session,
+                "review",
+                symbol=symbol,
+                review=payload["review"],
+                greeks=payload["greeks"],
+                actions=payload["actions"],
+                gamma_scalp=payload.get("gamma_scalp"),
+            ),
+        )
+    finally:
+        session.close()
+
+
 @router.get("/help")
 def help_page(request: Request):
     session = get_session()

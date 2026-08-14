@@ -8,6 +8,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/css/meridian-v2.css">
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/favicon.ico" sizes="32x32">
+  <script src="/static/vendor/lightweight-charts.js"></script>
   <script src="https://unpkg.com/htmx.org@2.0.4" defer></script>
 </head>
 <body class="{{ theme }}">
@@ -29,6 +32,7 @@
       {% if modules.vol_harvest %}<a href="/harvest" class="{{ 'active' if active == 'harvest' else '' }}">Harvest</a>{% endif %}
       {% if modules.vega_defense %}<a href="/vega" class="{{ 'active' if active == 'vega' else '' }}">Vega</a>{% endif %}
       {% if modules.mcx %}<a href="/commodities" class="{{ 'active' if active == 'commodities' else '' }}">MCX</a>{% endif %}
+      <a href="/review" class="{{ 'active' if active == 'review' else '' }}">Review</a>
       <a href="/help" class="{{ 'active' if active == 'help' else '' }}">Help</a>
       <a href="/export.md">Export</a>
     </nav>
@@ -39,6 +43,7 @@
       {% endfor %}
       <span class="badge">ACK {{ pending_count }}</span>
       <span class="num">{{ now.strftime('%d %b %Y  %H:%M') }}</span>
+      <button class="btn" type="button" data-theme-toggle>Light</button>
     </div>
   </header>
 
@@ -78,5 +83,6 @@
     <span>{{ subtitle }}</span>
     <span>Separate app from MERIDIAN v1</span>
   </footer>
+  <script src="/static/js/meridian-v2.js"></script>
 </body>
 </html>

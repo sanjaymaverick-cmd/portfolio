@@ -35,9 +35,34 @@ def test_pages_render(session):
     seed_demo(session)
     session.commit()
     client = TestClient(create_app())
-    for path in ("/", "/watch", "/signals", "/journal", "/hedge", "/harvest", "/vega", "/commodities", "/help"):
+    for path in (
+        "/",
+        "/watch",
+        "/signals",
+        "/journal",
+        "/hedge",
+        "/harvest",
+        "/vega",
+        "/commodities",
+        "/review",
+        "/help",
+    ):
         response = client.get(path)
         assert response.status_code == 200, path
     assert "MERIDIAN V2" in client.get("/").text
     assert "MERIDIAN V2" in client.get("/api/health").json()["app"]
     assert client.get("/api/health").json()["port"] == 8766
+    review = client.get("/api/review/GOLD")
+    assert review.status_code == 200
+    assert review.json()["review"]["title"]
+    assert "Daily PnL" in review.json()["review"]["daily_pnl"]
+    chart = client.get("/api/chart/GOLD")
+    assert chart.status_code == 200
+    assert "candles" in chart.json()
+    ico = client.get("/favicon.ico")
+    assert ico.status_code == 200
+    assert ico.content[:4] == b"\x00\x00\x01\x00"
+    svg = client.get("/static/favicon.svg")
+    assert svg.status_code == 200
+    assert "<svg" in svg.text
+    assert 'rel="icon"' in client.get("/").text

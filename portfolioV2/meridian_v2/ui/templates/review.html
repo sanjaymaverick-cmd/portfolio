@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}Review{% endblock %}
+{% block stage %}
+  <div class="page-head">
+    <div>
+      <h1>{{ symbol }} review</h1>
+      <p>Plain words. The numbers underneath are unchanged. This is not an order.</p>
+    </div>
+    <form method="get" action="/review" class="inline-form">
+      <label>Name
+        <input name="symbol" value="{{ symbol }}" aria-label="Symbol">
+      </label>
+      <button class="btn primary" type="submit">Open</button>
+    </form>
+  </div>
+
+  {% if review %}
+  <section class="greeks-hero">
+    <div class="metric">
+      <div class="label">Delta</div>
+      <div class="value num">{{ '%.2f'|format(greeks.delta_lots) }}</div>
+      <div class="sub">leftover lots</div>
+    </div>
+    <div class="metric">
+      <div class="label">Gamma</div>
+      <div class="value num {{ 'up' if greeks.gamma_sign == 'long' else 'down' if greeks.gamma_sign == 'short' else '' }}">{{ greeks.gamma_sign }}</div>
+      <div class="sub">{{ '%.4f'|format(greeks.gamma) }} · {{ 'helping' if greeks.scalp_helps else 'hurting' if greeks.gamma_sign == 'short' else 'flat' }}</div>
+    </div>
+    <div class="metric">
+      <div class="label">Vega</div>
+      <div class="value num">{{ '%.0f'|format(greeks.vega) }}</div>
+      <div class="sub">{{ '%.0f'|format(greeks.utilization * 100) }}% of the line</div>
+    </div>
+    <div class="metric">
+      <div class="label">Theta</div>
+      <div class="value num">{{ '%.0f'|format(greeks.theta) }}</div>
+      <div class="sub">₹ each quiet day</div>
+    </div>
+  </section>
+
+  <article class="panel review-card">
+    <h2>{{ review.title }}</h2>
+    <ul class="status-list">
+      {% for line in review.status %}
+      <li>{{ line }}</li>
+      {% endfor %}
+    </ul>
+    <p class="pnl">{{ review.daily_pnl }}</p>
+    <p class="pnl">{{ review.gamma_scalp_pnl }}</p>
+    <p class="suggestion">{{ review.suggestion }}</p>
+    <ol class="choices">
+      {% for item in review.choices %}
+      <li>{{ item }}</li>
+      {% endfor %}
+    </ol>
+  </article>
+
+  {% if gamma_scalp %}
+  <section class="panel review-card">
+    <h2>{{ gamma_scalp.title }}</h2>
+    <p class="muted">{{ 'Helping — sell the rise, buy the dip on the hedge.' if gamma_scalp.helps else 'Hurting — the same loop runs backward.' if gamma_scalp.hurts else 'No scalp story today.' }}</p>
+    <ul class="status-list">
+      {% for line in gamma_scalp.status %}
+      <li>{{ line }}</li>
+      {% endfor %}
+    </ul>
+    <p class="pnl">{{ gamma_scalp.daily_pnl }}</p>
+    <p class="pnl">{{ gamma_scalp.gamma_scalp_pnl }}</p>
+    <p class="suggestion">{{ gamma_scalp.suggestion }}</p>
+    <div class="step-grid">
+      {% for step in gamma_scalp.steps %}
+      <article class="step">
+        <h3>{{ step.label }}</h3>
+        <p class="num">₹{{ '%.2f'|format(step.price) }}</p>
+        <p>Leftover delta {{ '%+.2f'|format(step.delta_lots) }} lots</p>
+        <p>Futures to review {{ '%+.1f'|format(step.hedge_lots) }} lots</p>
+        <p>Locked extra {{ '%+.0f'|format(step.locked_pnl) }} ₹</p>
+        <p class="muted">{{ step.note }}</p>
+      </article>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  <div class="panel">
+    <h3>{{ symbol }} · candles only show finished numbers</h3>
+    <div class="chart-frame" data-chart data-symbol="{{ symbol }}" data-height="400" data-poll="30"></div>
+    <p class="muted">Green diamond = look at a long / entry. Red diamond = look at a short / exit. Soft band = recent range. Shaded days = higher-attention window. No model math is on this picture.</p>
+  </div>
+
+  <h2 class="kicker">Vega actions — each one also moves the other Greeks</h2>
+  <div class="action-grid">
+    {% for item in actions %}
+    <article class="panel {{ 'dim' if not item.enabled else '' }}">
+      <h3>{{ item.title }}</h3>
+      <p class="num">{{ '%+.1f'|format(item.opt_lots) }} lots</p>
+      <dl class="kv">
+        <dt>Delta</dt><dd class="num">{{ '%+.2f'|format(item.effects.delta) }}</dd>
+        <dt>Gamma</dt><dd class="num">{{ '%+.4f'|format(item.effects.gamma) }}</dd>
+        <dt>Vega</dt><dd class="num">{{ '%+.0f'|format(item.effects.vega) }}</dd>
+        <dt>Theta</dt><dd class="num">{{ '%+.0f'|format(item.effects.theta) }}</dd>
+      </dl>
+      <p class="muted">After this step: vega {{ '%.0f'|format(item.after_vega) }} · {{ '%.0f'|format(item.after_util * 100) }}% of the line</p>
+      <p class="muted">{{ item.note }}</p>
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="muted">Type GOLD to see the seeded option book.</p>
+  {% endif %}
+{% endblock %}
