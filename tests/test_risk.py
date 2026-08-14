@@ -36,6 +36,18 @@ def test_ewma_moves_toward_new_obs() -> None:
     assert state.beta > before
 
 
+def test_seed_ewma_preserves_zero_beta() -> None:
+    # Asset uncorrelated with market over the warmup → genuine beta 0.0.
+    # Orthogonal 4-cycles give cov == 0 exactly while both variances are > 0.
+    market = [0.02, -0.02, 0.02, -0.02] * 5
+    asset = [0.02, 0.02, -0.02, -0.02] * 5
+    rho, beta = corr_beta(asset, market)
+    assert beta is not None and abs(beta) < 1e-12
+    state = seed_ewma(asset, market, 0.94)
+    # Must seed near zero, not snap to 1.0 (the old `beta or 1.0` bug).
+    assert state.beta is not None and abs(state.beta) < 1e-9
+
+
 def test_shrink_and_sma_rsi() -> None:
     assert abs((shrink_beta(2.0, 0.15) or 0) - 1.85) < 1e-9
     closes = [100 + i for i in range(30)]

@@ -145,6 +145,26 @@ def build_vega_copy(
     )
 
 
+def build_vega_warn_copy(
+    symbol: str,
+    exp: VegaExposure,
+    pol: VegaPolicy,
+    util: float,
+) -> str:
+    """Heads-up copy for a warn-level utilization that is not over the limit.
+
+    No trade is sized here (per the sketch, a soft warn is passive / no-trade),
+    so the copy states the situation without proposing a +0.0-lot hedge.
+    """
+    side = "long" if exp.net_vega > 0 else "short" if exp.net_vega < 0 else "flat"
+    return (
+        f"VEGA REVIEW — not an order. [{PolicyKind.VEGA_DEFENSE.value}] {symbol}: "
+        f"net vega {exp.net_vega:,.0f} ₹/vol-pt ({side}), limit {pol.vega_limit:,.0f}, "
+        f"utilization {util:.0%} — approaching the vega limit but still within it. "
+        f"No hedge sized. Review trimming vol exposure or accepting the mark risk?"
+    )
+
+
 def evaluate_vega(
     exp: VegaExposure,
     pol: VegaPolicy,
@@ -224,11 +244,14 @@ def evaluate_vega(
     if over or warn:
         urgency = "elevated" if (over and regime_stress) else "review"
 
-    copy = (
-        build_vega_copy(exp.symbol, exp, pol, actionable, fut, util)
-        if urgency != "none"
-        else ""
-    )
+    if urgency == "none":
+        copy = ""
+    elif need_trade:
+        copy = build_vega_copy(exp.symbol, exp, pol, actionable, fut, util)
+    else:
+        # Warn-level only (not over, not forced): no trade was sized, so use
+        # the heads-up copy instead of one advising a +0.0-lot hedge.
+        copy = build_vega_warn_copy(exp.symbol, exp, pol, util)
 
     return VegaReview(
         symbol=exp.symbol,
