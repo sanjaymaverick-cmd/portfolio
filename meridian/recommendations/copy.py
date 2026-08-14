@@ -33,15 +33,15 @@ def write_reasoning(
     conf_txt = f"{float(confidence) * 100:.0f}%" if confidence is not None else "—"
     desk = f" in a {regime} regime" if regime else ""
     bits.append(
-        f"{symbol} is a {action} at composite {score_txt}{desk} (confidence {conf_txt})."
+        f"{symbol} is a {action} at score {score_txt}{desk} (how sure: {conf_txt}). This is not an order."
     )
     pos = shap.positives[:2]
     neg = shap.negatives[:2]
     if pos:
         bits.append(
-            "SHAP support: "
+            "What is helping: "
             + "; ".join(
-                f"{_LABEL[name]} {float(getattr(row, name)):.1f} ({value:+.2f} to the score)"
+                f"{_LABEL[name]} {float(getattr(row, name)):.1f} ({value:+.2f} on the score)"
                 for name, value in pos
                 if getattr(row, name, None) is not None
             )
@@ -49,7 +49,7 @@ def write_reasoning(
         )
     if neg:
         bits.append(
-            "Offsets: "
+            "What is holding it back: "
             + "; ".join(
                 f"{_LABEL[name]} {float(getattr(row, name)):.1f} ({value:+.2f})"
                 for name, value in neg
@@ -66,7 +66,6 @@ def write_reasoning(
         if present:
             bits.append("Factor marks: " + ", ".join(present) + ".")
     note = portfolio_note(symbol, weight, top_symbol, names)
-    bits.append("This is a monitor recommendation, not an order.")
     return " ".join(bits), note
 
 
@@ -77,9 +76,9 @@ def portfolio_note(
         return f"{names} names on the book."
     pct = float(weight)
     if pct >= 12:
-        return f"Concentrated: {symbol} is {pct:.1f}% of book — size is a constraint on adding."
+        return f"{symbol} is a large slice ({pct:.1f}%) of the book — adding more would make it even bigger."
     if pct >= 8:
-        return f"Material line: {symbol} is {pct:.1f}% of the {names}-name book."
+        return f"{symbol} is {pct:.1f}% of this {names}-name book."
     if top_symbol == symbol:
-        return f"Largest name at {pct:.1f}% of book."
+        return f"This is the biggest name, at {pct:.1f}% of the book."
     return f"{pct:.1f}% of a {names}-name book."

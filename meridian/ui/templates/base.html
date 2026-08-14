@@ -8,6 +8,10 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/css/meridian.css">
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/favicon.ico" sizes="32x32">
+  <script src="/static/vendor/lightweight-charts.js"></script>
+  <script src="/vendor/plotly.min.js"></script>
 </head>
 <body class="{{ theme }}">
   <header class="mast">
@@ -96,7 +100,6 @@
     <span>{{ subtitle }}</span>
     <span>Local book · tape + Screener</span>
   </footer>
-  <script src="/vendor/plotly.min.js"></script>
 
   <dialog id="manual">
     <form method="post" action="/holdings/manual" class="stack">
@@ -134,5 +137,6 @@
     </form>
   </dialog>
   <script src="/static/js/meridian.js"></script>
+  <script src="/static/js/meridian-chart.js"></script>
 </body>
 </html>

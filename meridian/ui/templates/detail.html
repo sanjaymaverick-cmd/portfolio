@@ -19,10 +19,13 @@
     <div>
       <div class="panel" style="margin-bottom:12px">
         <h3>Price · {{ bar_count }} sessions</h3>
-        {% if chart_html %}
+        {% if bar_count and bar_count > 1 %}
+        <div class="chart-frame" data-chart-url="/api/holdings/{{ holding.id }}/chart" data-height="360"></div>
+        <p class="muted">Green / red candles only. The score math stays off this picture.</p>
+        {% elif chart_html %}
         <div class="chart-frame">{{ chart_html|safe }}</div>
         {% else %}
-        <div class="placeholder">No OHLCV yet — mark the book to market</div>
+        <div class="placeholder">No price history yet — mark the book to market</div>
         {% endif %}
       </div>
       <div class="panel" style="margin-bottom:12px">
