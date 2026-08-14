@@ -49,6 +49,7 @@ def test_action_regime_results_rules() -> None:
     when = datetime(2026, 8, 13)
     hit = results_hit("TCS", ["TCS Q1 profit beat"], when, when, lookback_days=5)
     assert hit is not None and hit.kind == "results"
+    assert "today's news" in hit.title
     stale = results_hit("TCS", ["old"], when, datetime(2026, 7, 1), lookback_days=5)
     assert stale is None
 

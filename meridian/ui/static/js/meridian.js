@@ -2,6 +2,18 @@
   const open = (id) => document.getElementById(id)?.showModal();
   const close = (id) => document.getElementById(id)?.close();
 
+  document.querySelectorAll("form").forEach((form) => {
+    form.addEventListener("submit", () => {
+      const btn = form.querySelector("button[type=submit]");
+      if (!btn || btn.disabled) return;
+      btn.disabled = true;
+      const action = form.getAttribute("action") || "";
+      if (action.includes("/eod/")) {
+        btn.textContent = "Reading news…";
+      }
+    });
+  });
+
   document.querySelectorAll("[data-open]").forEach((el) => {
     el.addEventListener("click", () => open(el.dataset.open));
   });

@@ -7,7 +7,10 @@ from meridian.api.deps import db_session
 from meridian.api.schemas import HoldingIn, HoldingPatch
 from meridian.domain.models import MappedRow
 from meridian.ingestion.service import ImportService
+from meridian.config import get_settings
+from meridian.data_providers.service import PriceService
 from meridian.storage.repositories import HoldingRepo
+from meridian.ui.chart_payload import holding_chart_payload
 
 router = APIRouter(prefix="/holdings", tags=["holdings"])
 
@@ -50,6 +53,17 @@ def patch_holding(
         raise HTTPException(404, "Holding not found")
     repo.update_manual(holding, **payload.model_dump(exclude_unset=True))
     return repo.to_view(holding).model_dump(mode="json")
+
+
+@router.get("/{holding_id}/chart")
+def holding_chart(holding_id: int, session: Session = Depends(db_session)) -> dict:
+    repo = HoldingRepo(session)
+    holding = repo.get(holding_id)
+    if not holding:
+        raise HTTPException(404, "Holding not found")
+    view = repo.to_view(holding)
+    bars = PriceService(session).bars.list(view.yahoo, limit=get_settings().providers.history_days)
+    return holding_chart_payload(view.symbol, view.yahoo, bars)
 
 
 @router.delete("/{holding_id}")

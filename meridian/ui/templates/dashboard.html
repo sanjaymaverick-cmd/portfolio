@@ -26,6 +26,17 @@
   {% else %}
     {% include "partials/hero.html" %}
 
+    {% if request.query_params.get('note') == 'eod_ok' %}
+    <div class="alert-rail">
+      <strong>Done</strong>
+      <span>Evening movers updated from today's news. This can take half a minute when you click the button.</span>
+    </div>
+    {% elif request.query_params.get('note') == 'eod_fail' %}
+    <div class="alert-rail">
+      <strong>Could not finish</strong>
+      <span>The evening news job hit a lock or a network error. Wait a moment and click EOD movers once more.</span>
+    </div>
+    {% endif %}
     <div class="alert-rail">
       {% if open_alerts %}
       <strong>Alerts</strong>
@@ -116,7 +127,7 @@
             {% if card.day_pnl is not none %} · {{ card.day_pnl|inr_s }}{% endif %}
             {% if card.why %} · {{ card.why }}{% endif %}
           </p>
-          <p class="reasoning">{{ card.takeaway or 'No same-day headlines cleared the relevance gate.' }}</p>
+          <p class="reasoning">{{ card.takeaway or 'No useful company news found for today.' }}</p>
           {% if card.positives or card.negatives %}
           <ul class="driver-list">
             {% for row in card.positives[:3] %}
@@ -128,7 +139,7 @@
           </ul>
           {% endif %}
           <p class="muted" style="margin:10px 0 0;font-size:11px">
-            {{ card.engine or 'rules' }}{% if card.confidence is not none %} · conf {{ '%.0f'|format(card.confidence|float * 100) }}%{% endif %}
+            {{ card.engine or 'From headlines' }}{% if card.confidence is not none %} · how sure {{ '%.0f'|format(card.confidence|float * 100) }}%{% endif %}
             {% if card.market %} · {{ card.market }}{% endif %}
           </p>
         </article>

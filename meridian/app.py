@@ -42,6 +42,10 @@ def create_app() -> FastAPI:
     app.include_router(eod_api.router, prefix="/api")
     app.include_router(alerts_api.router, prefix="/api")
 
+    @app.get("/favicon.ico", include_in_schema=False)
+    def favicon() -> FileResponse:
+        return FileResponse(STATIC_DIR / "favicon.ico", media_type="image/x-icon")
+
     @app.get("/vendor/plotly.min.js", include_in_schema=False)
     def plotly_js() -> FileResponse:
         path = _plotly_path()
@@ -52,16 +56,37 @@ def create_app() -> FastAPI:
     return app
 
 
+def _plotly_js_under(root: Path) -> tuple[Path, ...]:
+    return (
+        root / "package_data" / "plotly.min.js",
+        root / "offline" / "plotly.min.js",
+    )
+
+
 def _plotly_path() -> Path | None:
+    candidates: list[Path] = [STATIC_DIR / "vendor" / "plotly.min.js"]
     try:
         import plotly
     except ImportError:
-        return None
-    root = Path(plotly.__file__).resolve().parent
-    for candidate in (
-        root / "package_data" / "plotly.min.js",
-        root / "offline" / "plotly.min.js",
+        plotly = None
+    if plotly is not None:
+        candidates.extend(_plotly_js_under(Path(plotly.__file__).resolve().parent))
+
+    # System `python -m meridian` will not see a venv install. Still serve
+    # the JS bundled next to the project venv so charts hydrate.
+    repo = Path(__file__).resolve().parents[1]
+    for pattern in (
+        ".venv/Lib/site-packages/plotly",
+        ".venv/lib/site-packages/plotly",
+        ".venv/lib/python*/site-packages/plotly",
     ):
-        if candidate.exists():
+        candidates.extend(
+            js
+            for root in repo.glob(pattern)
+            for js in _plotly_js_under(root)
+        )
+
+    for candidate in candidates:
+        if candidate.is_file():
             return candidate
     return None

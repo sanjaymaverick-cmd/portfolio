@@ -66,7 +66,7 @@ def test_reasoning_cites_shap_drivers() -> None:
 
 
 def test_portfolio_note_flags_concentration() -> None:
-    assert "Concentrated" in portfolio_note("X", Decimal("15"), "X", 10)
+    assert "large slice" in portfolio_note("X", Decimal("15"), "X", 10)
     assert "17-name" in portfolio_note("Y", Decimal("3.2"), "X", 17)
 
 

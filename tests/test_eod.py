@@ -8,7 +8,13 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from meridian.domain.models import MappedRow
-from meridian.recommendations.eod_rules import rule_attribution, validate_payload
+from meridian.recommendations.eod_rules import (
+    engine_label,
+    rule_attribution,
+    simplify_market,
+    simplify_takeaway,
+    validate_payload,
+)
 from meridian.recommendations.eod_service import EodService
 from meridian.scoring.news_filter import Headline, filter_headlines, sentiment_score
 from meridian.storage.market import QuoteRepo
@@ -57,8 +63,14 @@ def test_rule_payload_shape() -> None:
     assert payload["positive"]
     assert payload["positive"][0]["driver"].startswith("TCS")
     assert 0 <= payload["confidence"] <= 1
-    assert "Nifty" in payload["market_context"]
-    assert "name-specific" in payload["market_context"]
+    assert "Nifty was up" in payload["market_context"]
+    assert "company news" in payload["market_context"]
+    assert "rose" in payload["takeaway"]
+    assert engine_label("rules") == "From headlines"
+    old = "Nifty session -0.16%. Move is name-specific versus the index."
+    assert "down 0.16%" in (simplify_market(old) or "")
+    assert "company news" in (simplify_market(old) or "")
+    assert "rose 1.08%" in (simplify_takeaway("TCS higher (+1.08%). Cited: beat") or "")
 
 
 def test_validate_drops_invented_news() -> None:
