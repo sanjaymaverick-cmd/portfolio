@@ -32,7 +32,10 @@ class BookLeg:
 
     @property
     def notional_inr(self) -> float:
-        return self.lots * self.multiplier * self.mark_inr
+        # Delta-adjusted, matching HedgeLeg, so book_notional and hedge_notional
+        # share one convention and hedge_ratio compares like-for-like risk.
+        # For linear legs (delta=1.0) this is identical to lots * multiplier * mark.
+        return self.effective_lots * self.multiplier * self.mark_inr
 
     @property
     def gamma_lots(self) -> float:
@@ -217,16 +220,21 @@ def snap_lots(raw: float, lot_step: float) -> float:
 def band_breached(
     exposure: HedgeExposure, h_star: float, band: RebalanceBand, drift: float
 ) -> bool:
-    if abs(drift) < band.min_lots:
+    # Two independent triggers: absolute lot drift and ratio deviation. Either
+    # one breaches the band. (Ratio deviation has no meaning without book
+    # exposure, so it can only fire when hedge_ratio is defined.)
+    h_act = exposure.hedge_ratio
+    lot_breach = abs(drift) >= band.min_lots
+    ratio_breach = h_act is not None and abs(h_act - h_star) > band.ratio_tol
+    if not (lot_breach or ratio_breach):
         return False
+    # ₹ floor: suppress an otherwise-breaching drift whose notional impact is
+    # below the configured minimum.
     if band.min_notional_inr > 0 and abs(exposure.book_lots) > 1e-12:
         npl = exposure.book_notional_inr / exposure.book_lots
         if abs(drift * npl) < band.min_notional_inr:
             return False
-    h_act = exposure.hedge_ratio
-    if h_act is None:
-        return abs(drift) >= band.min_lots
-    return abs(h_act - h_star) > band.ratio_tol or abs(drift) >= band.min_lots
+    return True
 
 
 def build_review_copy(
